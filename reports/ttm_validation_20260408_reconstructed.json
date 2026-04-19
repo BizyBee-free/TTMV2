@@ -1,0 +1,116 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "n_breakout_bars": 73,
+      "n_non_breakout_bars": 132,
+      "true_breakout_rate": 0.5068493150684932,
+      "trap_detection_rate": 0.2222222222222222,
+      "trap_candidates": 36,
+      "mannwhitney_p_value": 0.0535922138027029,
+      "median_fwd_breakout": 5.2252063956597566e-05,
+      "median_fwd_non_breakout": 0.0002861433376747591,
+      "breakout_up_eval": {
+        "n_breakout_up": 0,
+        "ret_1_mean": null,
+        "ret_1_winrate": null,
+        "ret_1_sharpe": null,
+        "ret_3_mean": null,
+        "bucket_table": [],
+        "monotonic_low_mid_high": null
+      }
+    },
+    "warnings": [
+      "breakout: trap_detection_rate weak (0.222 on 36 adverse breakouts)"
+    ],
+    "errors": [
+      "breakout: no significant difference in forward returns (p=0.0536 >= 0.05)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 0.00038859183526180507,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 103,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 70,
+        "mid": 69,
+        "high": 66
+      },
+      "basis_bucket_mean_fwd": {
+        "low": 0.0005084022845755288,
+        "mid": 0.0005987696675653416,
+        "high": -2.2324927610892238e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient price↑ splits (PU_OIU=0, PU_OID=103, min=8)"
+    ]
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "n_samples": 205,
+      "pearson_r": 0.09107350578774055,
+      "pearson_p": 0.1940464512719684,
+      "spearman_rho": 0.13377312043065312,
+      "spearman_p": 0.05584652505841453,
+      "bucket_mean_fwd": {
+        "low": 0.0003125462492225089,
+        "mid": 5.701624767641003e-05,
+        "high": 0.0007351033194357014
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring: Pearson correlation not significant (r=0.0911, p=0.1940)",
+      "scoring: bucket mean forward returns not monotonic low→mid→high: [0.0003125462492225089, 5.701624767641003e-05, 0.0007351033194357014]"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 7
+    },
+    "warnings": [],
+    "errors": [
+      "adaptive: need >= 10 closed trades, got 7"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260408.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260408.jsonl",
+    "closes_path": "reports\\closes_VN30F1M_20260408_reconstructed_209.json",
+    "n_decisions": 209,
+    "n_bars_close": 209,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_0907.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_0918.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_0926.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_1052.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_1331.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_0907.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_0918.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_0926.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_1052.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_1331.jsonl"
+    ],
+    "decision_files_count": 5,
+    "trade_files_count": 5,
+    "paired_files_count": 5,
+    "bar_offset_final": 209
+  }
+}

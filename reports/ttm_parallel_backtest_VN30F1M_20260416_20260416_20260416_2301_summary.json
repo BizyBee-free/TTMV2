@@ -1,0 +1,37 @@
+{
+  "symbol": "VN30F1M",
+  "from_date": "20260416",
+  "to_date": "20260416",
+  "resolution": "1",
+  "n_bars": 226,
+  "decisions_jsonl": "D:\\Chuong\\BeeTrade\\reports\\ttm_parallel_backtest_VN30F1M_20260416_20260416_20260416_2301_decisions.jsonl",
+  "trades_jsonl": "D:\\Chuong\\BeeTrade\\reports\\ttm_parallel_backtest_VN30F1M_20260416_20260416_20260416_2301_trades.jsonl",
+  "summary": {
+    "event_type": "summary",
+    "total_bars": 226,
+    "v1": {
+      "trades": 0,
+      "winrate": 0.0,
+      "pnl": 0.0
+    },
+    "v2": {
+      "trades": 3,
+      "winrate": 0.6666666666666666,
+      "pnl": 4.2999999999999545
+    },
+    "agreement_rate": 0.9734513274336283,
+    "execution_same_direction_rate": 0.0,
+    "missed_trades_logged": 0,
+    "missed_trades_v2": 0,
+    "false_positive_v2_exits_loss": 1,
+    "top_block_reason_v2": "threshold",
+    "blocked_by_reason_count_v2": {
+      "threshold": 197,
+      "none": 25,
+      "position": 4
+    },
+    "follow_design_rate_v2": 1.0,
+    "closes_export_path": "D:\\Chuong\\BeeTrade\\reports\\closes_ttm_parallel_backtest_VN30F1M_20260416_20260416_20260416_2301_decisions.json",
+    "closes_n": 226
+  }
+}

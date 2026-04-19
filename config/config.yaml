@@ -1,0 +1,61 @@
+# HMM live-aligned optimization (scripts/hmm_optimize_loop.py)
+# Objective: maximize Score = 0.3*Calmar + 0.3*Sharpe + 0.4*ProfitFactor (weights below)
+# Features: OHLCV + optional basis (future vs index) + optional OI from cache
+
+symbol: "VN30F1M"
+from_date: "20250901"
+to_date: "20251231"
+
+refit_every: 5
+optimization_refit_every: 30
+
+fetch_timeout_seconds: 45
+max_bars: 650
+
+# Basis = future_close - index_close (z-scored); OI = relative change from DNSE secdef cache
+features:
+  use_basis: true
+  use_open_interest: true
+  index_symbol: "VN30"
+  # JSONL: data/cache/oi/{symbol_sanitized}.jsonl — populate from live secdef or leave empty (OI→0, still runs)
+
+hmm:
+  zscore_window: 20
+  n_iter: 40
+  random_state: 42
+
+backtest:
+  warmup_bars: 30
+  confidence: 0.65
+  commission_pct: 0.0
+  position_size: 1
+
+objective:
+  calmar_weight: 0.3
+  sharpe_weight: 0.3
+  profit_factor_weight: 0.4
+  calmar_cap: 10.0
+  sharpe_cap: 10.0
+  profit_factor_cap: 10.0
+
+constraints:
+  max_drawdown_pct_lt: 25.0
+  min_trades: 100
+  profit_factor_gt: 1.2
+  p_value_lt: 0.05
+  require_positive_increment_sharpe: true
+
+significance:
+  n_permutations: 800
+  seed: 42
+
+search_space:
+  window_size: [500, 1000, 2000, 3000]
+  k_states: [2, 3, 4]
+  timeframe: ["5m", "15m", "1h"]
+
+defaults_from_timeframe: "15m"
+
+output:
+  csv: "reports/hmm_optimization_results.csv"
+  markdown: "reports/hmm_optimization_summary.md"

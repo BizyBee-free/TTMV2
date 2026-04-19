@@ -1,0 +1,55 @@
+# Environment / Secrets -- KHONG BAO GIO COMMIT
+.env
+.env.*
+*.env.local
+!config/.env.example
+
+# Trading token file (see DNSE_TRADING_TOKEN_FILE in .env)
+config/dnse_trading_token.txt
+**/dnse_trading_token.txt
+
+# Local / tooling artifacts
+.coverage
+.tmp_dnse/
+.tmp_pip_dnse/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Logs
+logs/
+*.log
+*.jsonl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Paper trading data
+*.db
+*.sqlite3
+
+# PDF docs (keep in separate location)
+*.pdf

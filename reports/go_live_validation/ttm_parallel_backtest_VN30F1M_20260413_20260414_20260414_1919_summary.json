@@ -1,0 +1,36 @@
+{
+  "symbol": "VN30F1M",
+  "from_date": "20260413",
+  "to_date": "20260414",
+  "resolution": "15",
+  "n_bars": 32,
+  "decisions_jsonl": "reports\\go_live_validation\\ttm_parallel_backtest_VN30F1M_20260413_20260414_20260414_1919_decisions.jsonl",
+  "trades_jsonl": "reports\\go_live_validation\\ttm_parallel_backtest_VN30F1M_20260413_20260414_20260414_1919_trades.jsonl",
+  "summary": {
+    "event_type": "summary",
+    "total_bars": 32,
+    "v1": {
+      "trades": 0,
+      "winrate": 0.0,
+      "pnl": 0.0
+    },
+    "v2": {
+      "trades": 5,
+      "winrate": 0.6,
+      "pnl": 6.599999999999682
+    },
+    "agreement_rate": 0.625,
+    "execution_same_direction_rate": 0.0,
+    "missed_trades_logged": 0,
+    "missed_trades_v2": 0,
+    "false_positive_v2_exits_loss": 2,
+    "top_block_reason_v2": "none",
+    "blocked_by_reason_count_v2": {
+      "none": 19,
+      "threshold": 13
+    },
+    "follow_design_rate_v2": 0.4,
+    "closes_export_path": "D:\\Chuong\\BeeTrade\\reports\\go_live_validation\\closes_ttm_parallel_backtest_VN30F1M_20260413_20260414_20260414_1919_decisions.json",
+    "closes_n": 32
+  }
+}

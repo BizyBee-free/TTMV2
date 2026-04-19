@@ -1,0 +1,31 @@
+# DNSE SDK dependencies
+urllib3>=2.0
+websockets>=12.0
+msgpack>=1.0
+certifi
+
+# IANA time zones on Windows (zoneinfo); optional if using UTC+7 fallback in scripts
+tzdata>=2024.1
+
+# BeeTrade core
+pydantic>=2.0
+pydantic-settings>=2.0
+python-dotenv>=1.0
+python-json-logger>=2.0
+PyYAML>=6.0
+
+# GD3b - MCMC Strategy extensions
+numpy>=1.24
+pandas>=2.0
+
+# GD5 - HMM Strategy extensions
+hmmlearn>=0.3
+scikit-learn>=1.0
+
+# TTM walk-forward optimizer (scripts/ttm_optimize.py)
+optuna>=3.0
+
+# Testing
+pytest>=7.0
+pytest-asyncio>=0.21
+pytest-cov>=4.0

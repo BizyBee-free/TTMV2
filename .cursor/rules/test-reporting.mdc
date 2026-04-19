@@ -1,0 +1,25 @@
+---
+description: Enforce test reporting for all test activities in BeeTrade
+globs: tests/**/*.py, scripts/*test*.py, scripts/*_test*.py
+alwaysApply: false
+---
+
+# Test Reporting Convention
+
+After running any test (unit, integration, live, stress), MUST update `reports/TEST_REPORT.md`:
+
+## Unit Tests
+- Add a section with: ngày test, file test, X/Y PASS
+- Table: #, test case name, module, mô tả, kết quả (✅ PASS / ❌ FAIL)
+- Đánh giá: covered vs chưa cover
+
+## Live / Integration Tests
+- Add a section with: ngày test, script, loại test (Live/Mock)
+- Phương pháp, bảng kết quả có số liệu cụ thể
+- Phát hiện quan trọng + khuyến nghị cho PM
+
+## Rules
+- Every test MUST have evidence (output, numbers, timestamps)
+- FAIL tests MUST have root cause + action items
+- Update tổng hợp table ở cuối report
+- Update "Cập nhật lần cuối" date in report header

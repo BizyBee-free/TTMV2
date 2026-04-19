@@ -1,0 +1,18 @@
+﻿python : Traceback (most recent call last):
+At C:\Users\Admin\AppData\Local\Temp\ps-script-f0cca2e3-9587-4507-ac08-32a2271edff4.ps1:7 char:34
++ ... g\BeeTrade; python scripts/ttm_validation.py --decisions reports/ttm_ ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\Chuong\BeeTrade\scripts\ttm_validation.py", line 24, in <module>
+    raise SystemExit(main())
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 1624, in main
+    result = run_validation(
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 1319, in run_validation
+    closes, cw, close_meta = build_close_array(decisions, trades, closes_path)
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 290, in build_close_array
+    closes = load_closes_file(closes_path, n_bars)
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 248, in load_closes_file
+    raise ValueError(f"closes list len {len(arr)} < n_bars {n_bars}")
+ValueError: closes list len 158 < n_bars 243

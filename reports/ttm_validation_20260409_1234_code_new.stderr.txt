@@ -1,0 +1,278 @@
+﻿python : [ttm_validation WARNING] breakout: breakout: true_breakout_rate low (0.267)
+At C:\Users\Admin\AppData\Local\Temp\ps-script-b7833d31-392f-46a6-bd06-4b38f6a60adb.ps1:78 char:34
++ ... g\BeeTrade; python scripts/ttm_validation.py --decisions reports/ttm_ ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([ttm_validation...ate low (0.267):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[ttm_validation WARNING] breakout: breakout_strength_test: using weak validation due to limited samples (low=4, 
+high=4, min=15)
+[ttm_validation WARNING] breakout: breakout_up_eval table: low: n=4, mean=0.00012722667340505416, win=0.5 | mid: n=4, 
+mean=0.0002150846777246496, win=0.5 | high: n=4, mean=-7.401597706283e-05, win=0.0
+[ttm_validation ERROR] breakout: breakout_strength_test: weak validation failed (require mean_ret_4(high) > 
+mean_ret_4(low))
+[ttm_validation ERROR] breakout: breakout_up_eval: monotonic check failed on raw-breakout strength buckets (require 
+high > mid > low on mean ret_4)
+[ttm_validation ERROR] positioning: positioning: insufficient priceΓåæ splits (PU_OIU=0, PU_OID=30, min=8)
+[ttm_validation ERROR] scoring: scoring_long: Pearson correlation not significant (r=-0.0614, p=0.5698)
+[ttm_validation ERROR] scoring: scoring_long: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: 
+[0.0001696168639053721, 0.000366778003719679, -0.00018980218559432732]
+[ttm_validation ERROR] adaptive: adaptive: need >= 10 closed trades, got 7
+[ttm_validation ERROR] scoring_short: scoring_short: Pearson correlation not significant (r=-0.0614, p=0.5698)
+[ttm_validation ERROR] scoring_short: scoring_short: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: 
+[0.0001834754460745164, -0.00041203827452337353, -0.00013020545047772486]
+[ttm_validation INFO] close_quality missing_ratio=0.0 zero_return_ratio=0.45054945054945056 total_bars=92
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 12,
+      "n_non_breakout_bars": 76,
+      "n_raw_breakout_up_bars": 15,
+      "n_valid_breakout_up_bars": 12,
+      "raw_breakout_up_ratio": 0.13636363636363635,
+      "valid_breakout_up_ratio": 0.8,
+      "true_breakout_rate": 0.26666666666666666,
+      "trap_detection_rate": 0.2,
+      "trap_threshold": 0.0005,
+      "total_adverse_breakouts": 3,
+      "detected_traps": 3,
+      "trap_candidates": 15,
+      "mannwhitney_strength_high_vs_low_p_value": null,
+      "mannwhitney_strength_high_vs_low_stat": null,
+      "breakout_return_stats": {
+        "full_sample": {
+          "n": 12,
+          "mean_return": 8.94317913556246e-05,
+          "winrate": 0.3333333333333333,
+          "top_20_return_mean": 0.0006482124657056583,
+          "bottom_20_return_mean": -0.0001349820662774137
+        },
+        "non_zero_sample": {
+          "n": 6,
+          "mean_return": 0.00017886358271124915,
+          "winrate": 0.6666666666666666,
+          "top_20_return_mean": 0.0007299557378733915,
+          "bottom_20_return_mean": -0.0005399282651096548
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 8.943179135562455e-05,
+          "non_zero_minus_full_winrate": 0.3333333333333333,
+          "non_zero_minus_full_top_20_return_mean": 8.174327216773324e-05,
+          "non_zero_minus_full_bottom_20_return_mean": -0.0004049461988322411,
+          "zero_return_count": 6
+        }
+      },
+      "non_breakout_return_stats": {
+        "full_sample": {
+          "n": 76,
+          "mean_return": 0.00012036346245432723,
+          "winrate": 0.3684210526315789,
+          "top_20_return_mean": 0.0026387553995846453,
+          "bottom_20_return_mean": -0.00227129388738079
+        },
+        "non_zero_sample": {
+          "n": 47,
+          "mean_return": 0.00019463027971338025,
+          "winrate": 0.5957446808510638,
+          "top_20_return_mean": 0.0035759722457367805,
+          "bottom_20_return_mean": -0.0029600875094336855
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 7.426681725905302e-05,
+          "non_zero_minus_full_winrate": 0.22732362821948487,
+          "non_zero_minus_full_top_20_return_mean": 0.0009372168461521352,
+          "non_zero_minus_full_bottom_20_return_mean": -0.0006887936220528953,
+          "zero_return_count": 29
+        }
+      },
+      "breakout_up_eval": {
+        "n_is_breakout_up": 12,
+        "n_breakout_up": 12,
+        "ret_2_mean": 5.340329097347673e-05,
+        "ret_3_mean": 9.824089885159593e-05,
+        "ret_4_mean": 8.94317913556246e-05,
+        "ret_4_winrate": 0.3333333333333333,
+        "ret_4_sharpe": 0.22115981427121975,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 4,
+            "mean_ret_4": 0.00012722667340505416,
+            "winrate_ret_4": 0.5
+          },
+          {
+            "bucket": "mid",
+            "n": 4,
+            "mean_ret_4": 0.0002150846777246496,
+            "winrate_ret_4": 0.5
+          },
+          {
+            "bucket": "high",
+            "n": 4,
+            "mean_ret_4": -7.401597706283e-05,
+            "winrate_ret_4": 0.0
+          }
+        ],
+        "monotonic_low_mid_high": false,
+        "strength_validation_mode": "weak_monotonic_mean",
+        "mean_ret_4_high_minus_low": -0.00020124265046788417
+      },
+      "breakout_down_eval": {
+        "n_is_breakout_down": 0,
+        "ret_4_short_mean_return": null,
+        "ret_4_short_winrate": null,
+        "ret_4_short_sharpe": null,
+        "bucket_table": [],
+        "monotonic_low_mid_high": null
+      }
+    },
+    "warnings": [
+      "breakout: true_breakout_rate low (0.267)",
+      "breakout_strength_test: using weak validation due to limited samples (low=4, high=4, min=15)",
+      "breakout_up_eval table: low: n=4, mean=0.00012722667340505416, win=0.5 | mid: n=4, mean=0.0002150846777246496, win=0.5 | high: n=4, mean=-7.401597706283e-05, win=0.0"
+    ],
+    "errors": [
+      "breakout_strength_test: weak validation failed (require mean_ret_4(high) > mean_ret_4(low))",
+      "breakout_up_eval: monotonic check failed on raw-breakout strength buckets (require high > mid > low on mean ret_4)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 0.0006061985773137351,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 30,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 27,
+        "mid": 30,
+        "high": 31
+      },
+      "basis_bucket_mean_fwd": {
+        "low": 8.411344021855482e-05,
+        "mid": 0.0006089866420842957,
+        "high": -0.00033289862921398347
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient priceΓåæ splits (PU_OIU=0, PU_OID=30, min=8)"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 7
+    },
+    "warnings": [],
+    "errors": [
+      "adaptive: need >= 10 closed trades, got 7"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260409_1234.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260409_1234.jsonl",
+    "closes_path": "reports\\closes_VN30_proxy1_20260409_ffill.json",
+    "n_decisions": 92,
+    "n_bars_close": 92,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260409_1234.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260409_1234.jsonl"
+    ],
+    "decision_files_count": 1,
+    "trade_files_count": 1,
+    "paired_files_count": 1,
+    "bar_offset_final": 92,
+    "close_source": "external_closes_file",
+    "close_missing_count": 0,
+    "close_missing_ratio": 0.0,
+    "zero_return_ratio": 0.45054945054945056,
+    "total_bars": 92,
+    "scoring_mode": "all"
+  },
+  "scoring_long": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "aligned_target": "forward_return",
+      "n_samples": 88,
+      "pearson_r": -0.061406528174390046,
+      "pearson_p": 0.5698009775088464,
+      "spearman_rho": -0.04141810962277828,
+      "spearman_p": 0.7016119615169825,
+      "bucket_mean_aligned_return": {
+        "low": 0.0001696168639053721,
+        "mid": 0.000366778003719679,
+        "high": -0.00018980218559432732
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=-0.0614, p=0.5698)",
+      "scoring_long: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: [0.0001696168639053721, 0.000366778003719679, -0.00018980218559432732]"
+    ]
+  },
+  "scoring_short": {
+    "passed": false,
+    "metrics": {
+      "direction": "short",
+      "aligned_target": "neg_forward_return",
+      "n_samples": 88,
+      "pearson_r": -0.061406528174390046,
+      "pearson_p": 0.5698009775088464,
+      "spearman_rho": -0.04141810962277828,
+      "spearman_p": 0.7016119615169825,
+      "bucket_mean_aligned_return": {
+        "low": 0.0001834754460745164,
+        "mid": -0.00041203827452337353,
+        "high": -0.00013020545047772486
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_short: Pearson correlation not significant (r=-0.0614, p=0.5698)",
+      "scoring_short: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: [0.0001834754460745164, -0.00041203827452337353, -0.00013020545047772486]"
+    ]
+  },
+  "scoring_combined": {
+    "passed": false,
+    "long_passed": false,
+    "short_passed": false
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "aligned_target": "forward_return",
+      "n_samples": 88,
+      "pearson_r": -0.061406528174390046,
+      "pearson_p": 0.5698009775088464,
+      "spearman_rho": -0.04141810962277828,
+      "spearman_p": 0.7016119615169825,
+      "bucket_mean_aligned_return": {
+        "low": 0.0001696168639053721,
+        "mid": 0.000366778003719679,
+        "high": -0.00018980218559432732
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=-0.0614, p=0.5698)",
+      "scoring_long: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: [0.0001696168639053721, 0.000366778003719679, -0.00018980218559432732]"
+    ]
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 13,
+      "n_non_breakout_bars": 134,
+      "n_raw_breakout_up_bars": 13,
+      "raw_breakout_up_ratio": 0.08843537414965986,
+      "true_breakout_rate": 0.38461538461538464,
+      "trap_detection_rate": 0.0,
+      "trap_candidates": 8,
+      "mannwhitney_p_value": 0.6003114018951178,
+      "median_fwd_breakout": 0.0,
+      "median_fwd_non_breakout": 0.0,
+      "breakout_up_eval": {
+        "n_is_breakout_up": 13,
+        "n_breakout_up": 13,
+        "ret_1_mean": 2.1272058852173466e-05,
+        "ret_1_winrate": 0.46153846153846156,
+        "ret_1_sharpe": 0.06871482627766924,
+        "ret_3_mean": 3.758881545275573e-05,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 5,
+            "mean_ret_1": -0.00012246776273068855,
+            "winrate_ret_1": 0.2
+          },
+          {
+            "bucket": "mid",
+            "n": 4,
+            "mean_ret_1": -4.01879560609889e-05,
+            "winrate_ret_1": 0.5
+          },
+          {
+            "bucket": "high",
+            "n": 4,
+            "mean_ret_1": 0.0002624068507439133,
+            "winrate_ret_1": 0.75
+          }
+        ],
+        "monotonic_low_mid_high": true
+      }
+    },
+    "warnings": [
+      "breakout: true_breakout_rate low (0.385)",
+      "breakout: trap_detection_rate weak (0.000 on 8 adverse breakouts)",
+      "breakout_up_eval table: low: n=5, mean=-0.00012246776273068855, win=0.2 | mid: n=4, mean=-4.01879560609889e-05, win=0.5 | high: n=4, mean=0.0002624068507439133, win=0.75"
+    ],
+    "errors": [
+      "breakout: no significant difference in forward returns (p=0.6003 >= 0.05)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 0.0006061985773137351,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 30,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 47,
+        "mid": 50,
+        "high": 50
+      },
+      "basis_bucket_mean_fwd": {
+        "low": 0.0,
+        "mid": -0.0001270348636143097,
+        "high": 0.000331450956470237
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient price↑ splits (PU_OIU=0, PU_OID=30, min=5)"
+    ]
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "n_samples": 147,
+      "pearson_r": 0.017752427230522845,
+      "pearson_p": 0.831002413680561,
+      "spearman_rho": -0.07345325586129516,
+      "spearman_p": 0.3766066972375217,
+      "bucket_mean_fwd": {
+        "low": 0.0004475364834179973,
+        "mid": -0.00014406807253640434,
+        "high": -9.278747543252955e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring: Pearson correlation not significant (r=0.0178, p=0.8310)",
+      "scoring: bucket mean forward returns not monotonic low→mid→high: [0.0004475364834179973, -0.00014406807253640434, -9.278747543252955e-05]"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 15,
+      "early": {
+        "pnl_sum": -4.599999999999682,
+        "winrate": 0.5714285714285714,
+        "sharpe_proxy": -0.2262799874605679
+      },
+      "late": {
+        "pnl_sum": -10.200000000000273,
+        "winrate": 0.0,
+        "sharpe_proxy": -1.3190145302852863
+      },
+      "mannwhitney_early_late_pnl_p": 0.6943278943278944
+    },
+    "warnings": [
+      "adaptive: Mann-Whitney on early vs late PnL p=0.694 (no strong shift)"
+    ],
+    "errors": [
+      "adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260409_0722.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260409_0722.jsonl",
+    "closes_path": "reports\\closes_VN30_proxy1_20260409_morning_ffill.json",
+    "n_decisions": 151,
+    "n_bars_close": 151,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260409_0722.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260409_0722.jsonl"
+    ],
+    "decision_files_count": 1,
+    "trade_files_count": 1,
+    "paired_files_count": 1,
+    "bar_offset_final": 151
+  }
+}

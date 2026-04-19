@@ -1,0 +1,287 @@
+﻿python : [ttm_validation WARNING] breakout: breakout: true_breakout_rate low (0.385)
+At C:\Users\Admin\AppData\Local\Temp\ps-script-9c884acf-f8fd-4be8-a0bf-1600d30801ad.ps1:78 char:79
++ ... ','all')) { python scripts/ttm_validation.py --decisions reports/ttm_ ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([ttm_validation...ate low (0.385):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[ttm_validation WARNING] breakout: breakout: trap_detection_rate weak (0.077 on 13 raw up-breakouts)
+[ttm_validation WARNING] breakout: breakout_strength_test: using weak validation due to limited samples (low=4, 
+high=4, min=15)
+[ttm_validation WARNING] breakout: breakout_up_eval table: low: n=4, mean=6.75268549107583e-05, win=0.25 | mid: n=4, 
+mean=0.0002581215548183949, win=0.5 | high: n=4, mean=0.0003709678155693684, win=0.5
+[ttm_validation ERROR] positioning: positioning: insufficient priceΓåæ splits (PU_OIU=0, PU_OID=30, min=8)
+[ttm_validation ERROR] scoring: scoring_long: Pearson correlation not significant (r=0.0178, p=0.8310)
+[ttm_validation ERROR] scoring: scoring_long: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: 
+[0.0004475364834179973, -0.00014406807253640434, -9.278747543252955e-05]
+[ttm_validation WARNING] adaptive: adaptive: Mann-Whitney on early vs late PnL p=0.694 (no strong shift)
+[ttm_validation ERROR] adaptive: adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum
+[ttm_validation ERROR] scoring_short: scoring_short: Pearson correlation not significant (r=0.0178, p=0.8310)
+[ttm_validation ERROR] scoring_short: scoring_short: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: 
+[8.722022690657776e-05, 0.0001530723270699296, -0.0004475364834179973]
+[ttm_validation INFO] close_quality missing_ratio=0.0 zero_return_ratio=0.6666666666666666 total_bars=151
+{
+  "breakout": {
+    "passed": true,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 12,
+      "n_non_breakout_bars": 135,
+      "n_raw_breakout_up_bars": 13,
+      "n_valid_breakout_up_bars": 12,
+      "raw_breakout_up_ratio": 0.08163265306122448,
+      "valid_breakout_up_ratio": 0.9230769230769231,
+      "true_breakout_rate": 0.38461538461538464,
+      "trap_detection_rate": 0.07692307692307693,
+      "trap_threshold": 0.0005,
+      "total_adverse_breakouts": 1,
+      "detected_traps": 1,
+      "trap_candidates": 13,
+      "mannwhitney_strength_high_vs_low_p_value": null,
+      "mannwhitney_strength_high_vs_low_stat": null,
+      "breakout_return_stats": {
+        "full_sample": {
+          "n": 12,
+          "mean_return": 0.00023220540843284045,
+          "winrate": 0.4166666666666667,
+          "top_20_return_mean": 0.0013959109242624222,
+          "bottom_20_return_mean": -0.00022837177701839795
+        },
+        "non_zero_sample": {
+          "n": 7,
+          "mean_return": 0.0003980664144562979,
+          "winrate": 0.7142857142857143,
+          "top_20_return_mean": 0.001958812676572117,
+          "bottom_20_return_mean": -0.0007993012195643928
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 0.00016586100602345743,
+          "non_zero_minus_full_winrate": 0.2976190476190476,
+          "non_zero_minus_full_top_20_return_mean": 0.0005629017523096946,
+          "non_zero_minus_full_bottom_20_return_mean": -0.0005709294425459948,
+          "zero_return_count": 5
+        }
+      },
+      "non_breakout_return_stats": {
+        "full_sample": {
+          "n": 135,
+          "mean_return": 5.506918327112798e-05,
+          "winrate": 0.2,
+          "top_20_return_mean": 0.001648154978963236,
+          "bottom_20_return_mean": -0.00034320226565189905
+        },
+        "non_zero_sample": {
+          "n": 46,
+          "mean_return": 0.00016161608133917994,
+          "winrate": 0.5869565217391305,
+          "top_20_return_mean": 0.0034340804350300328,
+          "bottom_20_return_mean": -0.0029600875094336855
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 0.00010654689806805196,
+          "non_zero_minus_full_winrate": 0.3869565217391305,
+          "non_zero_minus_full_top_20_return_mean": 0.0017859254560667968,
+          "non_zero_minus_full_bottom_20_return_mean": -0.0026168852437817866,
+          "zero_return_count": 89
+        }
+      },
+      "breakout_up_eval": {
+        "n_is_breakout_up": 12,
+        "n_breakout_up": 12,
+        "ret_2_mean": 0.00019762907465717197,
+        "ret_3_mean": 0.00013458357041036694,
+        "ret_4_mean": 0.00023220540843284045,
+        "ret_4_winrate": 0.4166666666666667,
+        "ret_4_sharpe": 0.2767832480318629,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 4,
+            "mean_ret_4": 6.75268549107583e-05,
+            "winrate_ret_4": 0.25
+          },
+          {
+            "bucket": "mid",
+            "n": 4,
+            "mean_ret_4": 0.0002581215548183949,
+            "winrate_ret_4": 0.5
+          },
+          {
+            "bucket": "high",
+            "n": 4,
+            "mean_ret_4": 0.0003709678155693684,
+            "winrate_ret_4": 0.5
+          }
+        ],
+        "monotonic_low_mid_high": true,
+        "strength_validation_mode": "weak_monotonic_mean",
+        "mean_ret_4_high_minus_low": 0.00030344096065861004
+      },
+      "breakout_down_eval": {
+        "n_is_breakout_down": 0,
+        "ret_4_short_mean_return": null,
+        "ret_4_short_winrate": null,
+        "ret_4_short_sharpe": null,
+        "bucket_table": [],
+        "monotonic_low_mid_high": null
+      }
+    },
+    "warnings": [
+      "breakout: true_breakout_rate low (0.385)",
+      "breakout: trap_detection_rate weak (0.077 on 13 raw up-breakouts)",
+      "breakout_strength_test: using weak validation due to limited samples (low=4, high=4, min=15)",
+      "breakout_up_eval table: low: n=4, mean=6.75268549107583e-05, win=0.25 | mid: n=4, mean=0.0002581215548183949, win=0.5 | high: n=4, mean=0.0003709678155693684, win=0.5"
+    ],
+    "errors": []
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 0.0006061985773137351,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 30,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 47,
+        "mid": 50,
+        "high": 50
+      },
+      "basis_bucket_mean_fwd": {
+        "low": 0.0,
+        "mid": -0.0001270348636143097,
+        "high": 0.000331450956470237
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient priceΓåæ splits (PU_OIU=0, PU_OID=30, min=8)"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 15,
+      "early": {
+        "pnl_sum": -4.599999999999682,
+        "winrate": 0.5714285714285714,
+        "sharpe_proxy": -0.2262799874605679
+      },
+      "late": {
+        "pnl_sum": -10.200000000000273,
+        "winrate": 0.0,
+        "sharpe_proxy": -1.3190145302852863
+      },
+      "mannwhitney_early_late_pnl_p": 0.6943278943278944
+    },
+    "warnings": [
+      "adaptive: Mann-Whitney on early vs late PnL p=0.694 (no strong shift)"
+    ],
+    "errors": [
+      "adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260409_0722.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260409_0722.jsonl",
+    "closes_path": "reports\\closes_VN30_proxy1_20260409_ffill.json",
+    "n_decisions": 151,
+    "n_bars_close": 151,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260409_0722.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260409_0722.jsonl"
+    ],
+    "decision_files_count": 1,
+    "trade_files_count": 1,
+    "paired_files_count": 1,
+    "bar_offset_final": 151,
+    "close_source": "external_closes_file",
+    "close_missing_count": 0,
+    "close_missing_ratio": 0.0,
+    "zero_return_ratio": 0.6666666666666666,
+    "total_bars": 151,
+    "scoring_mode": "all"
+  },
+  "scoring_long": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "aligned_target": "forward_return",
+      "n_samples": 147,
+      "pearson_r": 0.017752427230522845,
+      "pearson_p": 0.831002413680561,
+      "spearman_rho": -0.07345325586129516,
+      "spearman_p": 0.3766066972375217,
+      "bucket_mean_aligned_return": {
+        "low": 0.0004475364834179973,
+        "mid": -0.00014406807253640434,
+        "high": -9.278747543252955e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0178, p=0.8310)",
+      "scoring_long: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: [0.0004475364834179973, -0.00014406807253640434, -9.278747543252955e-05]"
+    ]
+  },
+  "scoring_short": {
+    "passed": false,
+    "metrics": {
+      "direction": "short",
+      "aligned_target": "neg_forward_return",
+      "n_samples": 147,
+      "pearson_r": 0.017752427230522845,
+      "pearson_p": 0.831002413680561,
+      "spearman_rho": -0.07345325586129516,
+      "spearman_p": 0.3766066972375217,
+      "bucket_mean_aligned_return": {
+        "low": 8.722022690657776e-05,
+        "mid": 0.0001530723270699296,
+        "high": -0.0004475364834179973
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_short: Pearson correlation not significant (r=0.0178, p=0.8310)",
+      "scoring_short: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: [8.722022690657776e-05, 0.0001530723270699296, -0.0004475364834179973]"
+    ]
+  },
+  "scoring_combined": {
+    "passed": false,
+    "long_passed": false,
+    "short_passed": false
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "aligned_target": "forward_return",
+      "n_samples": 147,
+      "pearson_r": 0.017752427230522845,
+      "pearson_p": 0.831002413680561,
+      "spearman_rho": -0.07345325586129516,
+      "spearman_p": 0.3766066972375217,
+      "bucket_mean_aligned_return": {
+        "low": 0.0004475364834179973,
+        "mid": -0.00014406807253640434,
+        "high": -9.278747543252955e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0178, p=0.8310)",
+      "scoring_long: bucket mean aligned returns not monotonic lowΓåÆmidΓåÆhigh: [0.0004475364834179973, -0.00014406807253640434, -9.278747543252955e-05]"
+    ]
+  }
+}

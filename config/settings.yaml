@@ -1,0 +1,37 @@
+# BeeTrade Application Settings
+# These are non-secret configuration parameters.
+# Secret credentials go in .env file.
+
+symbols:
+  # Symbols to subscribe to via WebSocket
+  derivatives:
+    - VN30F1M
+  covered_warrants: []  # Will be populated based on analysis
+  equities:
+    - HPG
+    - SSI
+
+websocket:
+  encoding: msgpack
+  ohlc_resolution: "1"  # 1-minute candles
+  buffer_size:
+    ohlc: 50
+    trades: 100
+
+risk:
+  max_daily_loss_pct: 2.0
+  max_position_size: 1000
+  max_orders_per_minute: 10
+  stoploss_default_pct: 3.0
+
+pair_trading:
+  # Pair trading configuration (GD3a)
+  pairs: []
+  spread_threshold: 0.02
+  rollback_timeout_sec: 5
+
+mcmc:
+  # MCMC strategy parameters (GD3b)
+  num_paths: 10000
+  confidence_threshold: 0.65
+  lookback_candles: 50

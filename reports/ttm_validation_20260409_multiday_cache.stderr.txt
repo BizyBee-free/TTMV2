@@ -1,0 +1,16 @@
+﻿python : Traceback (most recent call last):
+At C:\Users\Admin\AppData\Local\Temp\ps-script-cb532d85-e7c6-4af9-b034-2a8f507eb498.ps1:78 char:34
++ ... g\BeeTrade; python scripts/ttm_validation.py --reports-dir reports -- ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\Chuong\BeeTrade\scripts\ttm_validation.py", line 24, in <module>
+    raise SystemExit(main())
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 1606, in main
+    result = run_validation_multiday(
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 1450, in run_validation_multiday
+    closes, close_warnings, close_meta = build_close_array_multiday_from_cache(
+  File "D:\Chuong\BeeTrade\src\strategies\ttm\ttm_validation.py", line 375, in build_close_array_multiday_from_cache
+    raise ValueError("multiday_closes: no timestamps matched cache closes")
+ValueError: multiday_closes: no timestamps matched cache closes

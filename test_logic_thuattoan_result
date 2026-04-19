@@ -1,0 +1,16 @@
+KET QUA TEST LOGIC THUAT TOAN (HMM/Markov)
+Data bars=1280, features=(1279, 3), k_states=3
+Optimized config: seed=42, zscore_window=10, state_smoothing_window=1, state_min_run_bars=1, state_scoring_mode=strength, state_strength_flat_quantile=0.25, pass_count=6/10
+
+Test 1: PASS | markov_kl=0.018920 (threshold<0.02)
+Test 2: FAIL | state_overlap=0.863888 (threshold<0.3)
+Test 3: FAIL | mutual_info=0.003604 (threshold>0.01)
+Test 4: PASS | transition_variance=0.001925 (threshold<0.05)
+Test 5: FAIL | entropy=1.039991, max=1.098612, ratio=0.947 (threshold<0.8)
+Test 6: PASS | feature_importance: log_ret=0.07031, range_ratio=0.07292, basis_spread=0.02344
+Test 7: PASS | robust_delay_acc=0.4517, robust_noise_acc=0.4714
+Test 8: PASS | hmm_acc=0.5260 vs baseline_acc=0.4973
+Test 9: PASS | walk_forward_mean=0.5010, std=0.0308, n=4
+Test 10: FAIL | expectancy_after_cost=-0.001794
+
+Ghi chú: Test định lượng theo checklist trong test_logic_toan.docx, chạy trên dữ liệu hiện có tại thời điểm chạy.

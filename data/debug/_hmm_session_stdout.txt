@@ -1,0 +1,58 @@
+2026-03-31 10:55:02 [INFO    ] beetrade: Logging initialized
+[BeeTrade] Thư mục log (JSON): D:\Chuong\BeeTrade\logs
+[BeeTrade] File trace HMM khi bật HMM_LIVE_DEBUG_TRACE: D:\Chuong\BeeTrade\data\debug\hmm_live_trace.jsonl
+2026-03-31 10:55:02 [INFO    ] beetrade.hmm_live_session: Đường dẫn log và file trace HMM
+2026-03-31 10:55:02 [INFO    ] beetrade.dnse_client: Trading token loaded from settings (env or file)
+2026-03-31 10:55:02 [INFO    ] beetrade.dnse_client: BeeTradeClient initialized
+[hmm_live_session] Ngày 2026-03-31 (VN) | 09:00-11:30, nghỉ, 13:00-15:00 | symbol=VN30F1M submit=True days=120
+2026-03-31 10:55:02 [INFO    ] beetrade.hmm_live_session: HMM live session started
+[hmm_live_session] Tick 10:55:02 (quyết định theo nến 15m 10:45) — run_once …
+2026-03-31 10:55:04 [INFO    ] beetrade.hmm_live_runner: [Live] Mã phái sinh: input='VN30F1M' data_symbol='VN30F1M' trade_symbol='41I1G4000' (loại=derivative).
+2026-03-31 10:55:04 [INFO    ] beetrade.hmm_live_runner: [Live] Chỉ số basis 'VN30' → data_symbol='VN30' (loại=index); đây là chỉ số, không phải mã hợp đồng 9 ký tự.
+[Live] Mã phái sinh: input='VN30F1M' data_symbol='VN30F1M' trade_symbol='41I1G4000' (loại=derivative).
+[Live] Chỉ số basis 'VN30' → data_symbol='VN30' (loại=index); đây là chỉ số, không phải mã hợp đồng 9 ký tự.
+2026-03-31 10:55:04 [INFO    ] beetrade.basis_data: basis_data: data source mapping
+[Basis] Nguồn giá data Future=VN30F1M (trade=41I1G4000), Index=VN30.
+2026-03-31 10:55:04 [INFO    ] beetrade.data_fetcher: DataFetcher: loaded from cache
+2026-03-31 10:55:04 [INFO    ] beetrade.data_fetcher: DataFetcher: loaded from cache
+2026-03-31 10:55:04 [WARNING ] beetrade.basis_data: basis_data: dropped future bars without index match
+2026-03-31 10:55:04 [INFO    ] beetrade.basis_data: [Basis] Giá gần nhất: Future=1821.40 Index=1820.22 => Basis=1.18
+[Basis] Giá gần nhất: Future=1821.40 Index=1820.22 => Basis=1.18
+2026-03-31 10:55:04 [INFO    ] beetrade.hmm_live_runner: [Live] bar_unix=1774924200 bar_utc=2026-03-31T02:30:00+00:00 exec_utc=2026-03-31T03:55:04.360203+00:00 age_sec=5104
+[Live] bar_unix=1774924200 bar_utc=2026-03-31T02:30:00+00:00 exec_utc=2026-03-31T03:55:04.360203+00:00 age_sec=5104
+2026-03-31 10:55:04 [INFO    ] beetrade.hmm_live_runner: skip duplicate bar
+  detail=duplicate_bar -> thử gọi lại API sau 60 giây …
+2026-03-31 10:56:04 [INFO    ] beetrade.hmm_live_runner: [Live] Mã phái sinh: input='VN30F1M' data_symbol='VN30F1M' trade_symbol='41I1G4000' (loại=derivative).
+2026-03-31 10:56:04 [INFO    ] beetrade.hmm_live_runner: [Live] Chỉ số basis 'VN30' → data_symbol='VN30' (loại=index); đây là chỉ số, không phải mã hợp đồng 9 ký tự.
+[Live] Mã phái sinh: input='VN30F1M' data_symbol='VN30F1M' trade_symbol='41I1G4000' (loại=derivative).
+[Live] Chỉ số basis 'VN30' → data_symbol='VN30' (loại=index); đây là chỉ số, không phải mã hợp đồng 9 ký tự.
+2026-03-31 10:56:04 [INFO    ] beetrade.basis_data: basis_data: data source mapping
+[Basis] Nguồn giá data Future=VN30F1M (trade=41I1G4000), Index=VN30.
+2026-03-31 10:56:04 [INFO    ] beetrade.data_fetcher: DataFetcher: loaded from cache
+2026-03-31 10:56:04 [INFO    ] beetrade.data_fetcher: DataFetcher: loaded from cache
+2026-03-31 10:56:04 [WARNING ] beetrade.basis_data: basis_data: dropped future bars without index match
+2026-03-31 10:56:04 [INFO    ] beetrade.basis_data: [Basis] Giá gần nhất: Future=1821.40 Index=1820.22 => Basis=1.18
+[Basis] Giá gần nhất: Future=1821.40 Index=1820.22 => Basis=1.18
+2026-03-31 10:56:04 [INFO    ] beetrade.hmm_live_runner: [Live] bar_unix=1774924200 bar_utc=2026-03-31T02:30:00+00:00 exec_utc=2026-03-31T03:56:04.437829+00:00 age_sec=5164
+[Live] bar_unix=1774924200 bar_utc=2026-03-31T02:30:00+00:00 exec_utc=2026-03-31T03:56:04.437829+00:00 age_sec=5164
+2026-03-31 10:56:04 [INFO    ] beetrade.hmm_live_runner: skip duplicate bar
+  retry ok=False detail=duplicate_bar dir=None label=None order=None
+2026-03-31 10:56:04 [INFO    ] beetrade.hmm_live_session: HMM session duplicate retry result
+  ok=False detail=duplicate_bar dir=None label=None order=None
+2026-03-31 10:56:04 [INFO    ] beetrade.hmm_live_session: HMM session tick result
+[hmm_live_session] Tick 10:57:00 (quyết định theo nến 15m 10:45) — run_once …
+2026-03-31 10:57:02 [INFO    ] beetrade.hmm_live_runner: [Live] Mã phái sinh: input='VN30F1M' data_symbol='VN30F1M' trade_symbol='41I1G4000' (loại=derivative).
+2026-03-31 10:57:02 [INFO    ] beetrade.hmm_live_runner: [Live] Chỉ số basis 'VN30' → data_symbol='VN30' (loại=index); đây là chỉ số, không phải mã hợp đồng 9 ký tự.
+[Live] Mã phái sinh: input='VN30F1M' data_symbol='VN30F1M' trade_symbol='41I1G4000' (loại=derivative).
+[Live] Chỉ số basis 'VN30' → data_symbol='VN30' (loại=index); đây là chỉ số, không phải mã hợp đồng 9 ký tự.
+2026-03-31 10:57:02 [INFO    ] beetrade.basis_data: basis_data: data source mapping
+[Basis] Nguồn giá data Future=VN30F1M (trade=41I1G4000), Index=VN30.
+2026-03-31 10:57:02 [INFO    ] beetrade.data_fetcher: DataFetcher: loaded from cache
+2026-03-31 10:57:02 [INFO    ] beetrade.data_fetcher: DataFetcher: loaded from cache
+2026-03-31 10:57:02 [WARNING ] beetrade.basis_data: basis_data: dropped future bars without index match
+2026-03-31 10:57:02 [INFO    ] beetrade.basis_data: [Basis] Giá gần nhất: Future=1821.40 Index=1820.22 => Basis=1.18
+[Basis] Giá gần nhất: Future=1821.40 Index=1820.22 => Basis=1.18
+2026-03-31 10:57:02 [INFO    ] beetrade.hmm_live_runner: [Live] bar_unix=1774924200 bar_utc=2026-03-31T02:30:00+00:00 exec_utc=2026-03-31T03:57:02.035223+00:00 age_sec=5222
+[Live] bar_unix=1774924200 bar_utc=2026-03-31T02:30:00+00:00 exec_utc=2026-03-31T03:57:02.035223+00:00 age_sec=5222
+2026-03-31 10:57:02 [INFO    ] beetrade.hmm_live_runner: skip duplicate bar
+  detail=duplicate_bar -> thử gọi lại API sau 60 giây …

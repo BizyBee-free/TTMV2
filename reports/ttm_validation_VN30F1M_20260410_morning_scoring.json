@@ -1,0 +1,264 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 9,
+      "n_non_breakout_bars": 138,
+      "n_raw_breakout_up_bars": 15,
+      "n_valid_breakout_up_bars": 9,
+      "raw_breakout_up_ratio": 0.061224489795918366,
+      "valid_breakout_up_ratio": 0.6,
+      "true_breakout_rate": 0.4,
+      "trap_detection_rate": 0.4,
+      "trap_threshold": 0.0005,
+      "total_adverse_breakouts": 6,
+      "detected_traps": 6,
+      "trap_candidates": 15,
+      "mannwhitney_strength_high_vs_low_p_value": null,
+      "mannwhitney_strength_high_vs_low_stat": null,
+      "breakout_return_stats": {
+        "full_sample": {
+          "n": 9,
+          "mean_return": 0.000763729571906862,
+          "winrate": 0.6666666666666666,
+          "top_20_return_mean": 0.00294374274331349,
+          "bottom_20_return_mean": -0.0011296115862555883
+        },
+        "non_zero_sample": {
+          "n": 9,
+          "mean_return": 0.000763729571906862,
+          "winrate": 0.6666666666666666,
+          "top_20_return_mean": 0.00294374274331349,
+          "bottom_20_return_mean": -0.0011296115862555883
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 0.0,
+          "non_zero_minus_full_winrate": 0.0,
+          "non_zero_minus_full_top_20_return_mean": 0.0,
+          "non_zero_minus_full_bottom_20_return_mean": 0.0,
+          "zero_return_count": 0
+        }
+      },
+      "non_breakout_return_stats": {
+        "full_sample": {
+          "n": 138,
+          "mean_return": 0.00011350944336400102,
+          "winrate": 0.4927536231884058,
+          "top_20_return_mean": 0.0015216160874333424,
+          "bottom_20_return_mean": -0.0010173806193091712
+        },
+        "non_zero_sample": {
+          "n": 136,
+          "mean_return": 0.00011517869988405983,
+          "winrate": 0.5,
+          "top_20_return_mean": 0.0015216160874333424,
+          "bottom_20_return_mean": -0.0010173806193091712
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 1.6692565200588164e-06,
+          "non_zero_minus_full_winrate": 0.00724637681159418,
+          "non_zero_minus_full_top_20_return_mean": 0.0,
+          "non_zero_minus_full_bottom_20_return_mean": 0.0,
+          "zero_return_count": 2
+        }
+      },
+      "breakout_up_eval": {
+        "n_is_breakout_up": 10,
+        "n_breakout_up": 10,
+        "ret_2_mean": 0.00042794314528347293,
+        "ret_3_mean": 0.0006938060136609685,
+        "ret_4_mean": 0.000763729571906862,
+        "ret_4_winrate": 0.6666666666666666,
+        "ret_4_sharpe": 0.5112506943467031,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 4,
+            "mean_ret_4": 0.0008793164561320748,
+            "winrate_ret_4": 0.75
+          },
+          {
+            "bucket": "mid",
+            "n": 2,
+            "mean_ret_4": 0.0011127504609491994,
+            "winrate_ret_4": 0.5
+          },
+          {
+            "bucket": "high",
+            "n": 3,
+            "mean_ret_4": 0.0003769331335783533,
+            "winrate_ret_4": 0.6666666666666666
+          }
+        ],
+        "monotonic_low_mid_high": false,
+        "strength_validation_mode": "weak_monotonic_mean",
+        "mean_ret_4_high_minus_low": -0.0005023833225537215
+      },
+      "breakout_down_eval": {
+        "n_is_breakout_down": 0,
+        "ret_4_short_mean_return": null,
+        "ret_4_short_winrate": null,
+        "ret_4_short_sharpe": null,
+        "bucket_table": [],
+        "monotonic_low_mid_high": null
+      }
+    },
+    "warnings": [
+      "breakout_strength_test: using weak validation due to limited samples (low=4, high=3, min=8)",
+      "breakout_up_eval table: low: n=4, mean=0.0008793164561320748, win=0.75 | mid: n=2, mean=0.0011127504609491994, win=0.5 | high: n=3, mean=0.0003769331335783533, win=0.6666666666666666"
+    ],
+    "errors": [
+      "breakout_strength_test: weak validation failed (require mean_ret_4(high) > mean_ret_4(low))",
+      "breakout_up_eval: monotonic check failed on raw-breakout strength buckets (require high > mid > low on mean ret_4)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 7.42341241579315e-05,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 68,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 51,
+        "mid": 46,
+        "high": 50
+      },
+      "basis_bucket_mean_fwd": {
+        "low": -5.375100774815737e-05,
+        "mid": -5.6685215141489785e-05,
+        "high": 0.000557733812461169
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient price↑ splits (PU_OIU=0, PU_OID=68, min=5)"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 31,
+      "early": {
+        "pnl_sum": 12.499999999999773,
+        "winrate": 0.6666666666666666,
+        "sharpe_proxy": 0.3522874304847034
+      },
+      "late": {
+        "pnl_sum": 0.5,
+        "winrate": 0.5625,
+        "sharpe_proxy": 0.02472733890671112
+      },
+      "mannwhitney_early_late_pnl_p": 0.3526882402093108
+    },
+    "warnings": [
+      "adaptive: Mann-Whitney on early vs late PnL p=0.353 (no strong shift)"
+    ],
+    "errors": [
+      "adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260410_0734.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260410_0734.jsonl",
+    "closes_path": "reports\\closes_VN30F1M_20260410_0734_reconstructed.json",
+    "n_decisions": 151,
+    "n_bars_close": 151,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260410_0734.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260410_0734.jsonl"
+    ],
+    "decision_files_count": 1,
+    "trade_files_count": 1,
+    "paired_files_count": 1,
+    "bar_offset_final": 151,
+    "close_source": "external_closes_file",
+    "close_missing_count": 0,
+    "close_missing_ratio": 0.0,
+    "zero_return_ratio": 0.04666666666666667,
+    "total_bars": 151,
+    "scoring_mode": "all",
+    "closes_reconstruction_note": "closes_VN30F1M_20260410_0734_reconstructed.json: cumulative from features.positioning_log.price_change anchored at bar-1 close from first VN30F1M trade entry (1936.1). No official OHLC cache for 20260410 derivative; use for exploratory scoring only."
+  },
+  "scoring_long": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "aligned_target": "forward_return",
+      "n_samples": 147,
+      "pearson_r": 0.07711838454335315,
+      "pearson_p": 0.35319379087330455,
+      "spearman_rho": 0.06148530779434728,
+      "spearman_p": 0.4594176483030027,
+      "bucket_mean_aligned_return": {
+        "low": 6.789271300062955e-05,
+        "mid": 0.00010118828816834285,
+        "high": 0.00029087551579824993
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0771, p=0.3532)"
+    ]
+  },
+  "scoring_short": {
+    "passed": false,
+    "metrics": {
+      "direction": "short",
+      "aligned_target": "neg_forward_return",
+      "n_samples": 147,
+      "pearson_r": 0.07711838454335315,
+      "pearson_p": 0.35319379087330455,
+      "spearman_rho": 0.06148530779434728,
+      "spearman_p": 0.4594176483030027,
+      "bucket_mean_aligned_return": {
+        "low": -0.00029087551579824993,
+        "mid": -0.00010118828816834285,
+        "high": -6.789271300062955e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_short: Pearson correlation not significant (r=0.0771, p=0.3532)"
+    ]
+  },
+  "scoring_combined": {
+    "passed": false,
+    "long_passed": false,
+    "short_passed": false
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "aligned_target": "forward_return",
+      "n_samples": 147,
+      "pearson_r": 0.07711838454335315,
+      "pearson_p": 0.35319379087330455,
+      "spearman_rho": 0.06148530779434728,
+      "spearman_p": 0.4594176483030027,
+      "bucket_mean_aligned_return": {
+        "low": 6.789271300062955e-05,
+        "mid": 0.00010118828816834285,
+        "high": 0.00029087551579824993
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0771, p=0.3532)"
+    ]
+  }
+}

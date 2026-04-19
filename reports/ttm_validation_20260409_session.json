@@ -1,0 +1,150 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 15,
+      "n_non_breakout_bars": 139,
+      "n_raw_breakout_up_bars": 15,
+      "raw_breakout_up_ratio": 0.09740259740259741,
+      "true_breakout_rate": 0.3333333333333333,
+      "trap_detection_rate": 0.0,
+      "trap_candidates": 10,
+      "mannwhitney_p_value": 0.655677643390332,
+      "median_fwd_breakout": 0.0,
+      "median_fwd_non_breakout": 0.0,
+      "breakout_up_eval": {
+        "n_is_breakout_up": 17,
+        "n_breakout_up": 17,
+        "ret_1_mean": 1.6266868534015002e-05,
+        "ret_1_winrate": 0.35294117647058826,
+        "ret_1_sharpe": 0.060056020736850416,
+        "ret_3_mean": 3.2576973392388293e-05,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 6,
+            "mean_ret_1": -0.00015829029090423771,
+            "winrate_ret_1": 0.16666666666666666
+          },
+          {
+            "bucket": "mid",
+            "n": 5,
+            "mean_ret_1": 3.5330221505605594e-05,
+            "winrate_ret_1": 0.4
+          },
+          {
+            "bucket": "high",
+            "n": 6,
+            "mean_ret_1": 0.00017493790049594223,
+            "winrate_ret_1": 0.5
+          }
+        ],
+        "monotonic_low_mid_high": true
+      }
+    },
+    "warnings": [
+      "breakout: true_breakout_rate low (0.333)",
+      "breakout: trap_detection_rate weak (0.000 on 10 adverse breakouts)",
+      "breakout_up_eval table: low: n=6, mean=-0.00015829029090423771, win=0.16666666666666666 | mid: n=5, mean=3.5330221505605594e-05, win=0.4 | high: n=6, mean=0.00017493790049594223, win=0.5"
+    ],
+    "errors": [
+      "breakout: no significant difference in forward returns (p=0.6557 >= 0.05)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 0.0006061985773137351,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 30,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 53,
+        "mid": 49,
+        "high": 52
+      },
+      "basis_bucket_mean_fwd": {
+        "low": 0.0,
+        "mid": -0.00011158643676422454,
+        "high": 0.00030170269315852623
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient price↑ splits (PU_OIU=0, PU_OID=30, min=5)"
+    ]
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "n_samples": 154,
+      "pearson_r": 0.015251140115233684,
+      "pearson_p": 0.8510878372910418,
+      "spearman_rho": -0.06587368321079763,
+      "spearman_p": 0.41696792233294655,
+      "bucket_mean_fwd": {
+        "low": 0.00039087012185664975,
+        "mid": -0.0001104505836234718,
+        "high": -8.722022690657776e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring: Pearson correlation not significant (r=0.0153, p=0.8511)",
+      "scoring: bucket mean forward returns not monotonic low→mid→high: [0.00039087012185664975, -0.0001104505836234718, -8.722022690657776e-05]"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 15,
+      "early": {
+        "pnl_sum": -4.599999999999682,
+        "winrate": 0.5714285714285714,
+        "sharpe_proxy": -0.2262799874605679
+      },
+      "late": {
+        "pnl_sum": -10.200000000000273,
+        "winrate": 0.0,
+        "sharpe_proxy": -1.3190145302852863
+      },
+      "mannwhitney_early_late_pnl_p": 0.6943278943278944
+    },
+    "warnings": [
+      "adaptive: Mann-Whitney on early vs late PnL p=0.694 (no strong shift)"
+    ],
+    "errors": [
+      "adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260409.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260409.jsonl",
+    "closes_path": "reports\\closes_VN30_proxy1_20260409_ffill.json",
+    "n_decisions": 158,
+    "n_bars_close": 158,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260409_0722.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260409_1234.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260409_0722.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260409_1234.jsonl"
+    ],
+    "decision_files_count": 2,
+    "trade_files_count": 2,
+    "paired_files_count": 2,
+    "bar_offset_final": 158
+  }
+}

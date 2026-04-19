@@ -1,0 +1,153 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "close_proxy",
+      "breakout_window": 20,
+      "n_breakout_bars": 39,
+      "n_non_breakout_bars": 166,
+      "n_raw_breakout_up_bars": 39,
+      "raw_breakout_up_ratio": 0.1902439024390244,
+      "true_breakout_rate": 0.5128205128205128,
+      "trap_detection_rate": 0.05263157894736842,
+      "trap_candidates": 19,
+      "mannwhitney_p_value": 0.1533344433688268,
+      "median_fwd_breakout": 5.2306726645117914e-05,
+      "median_fwd_non_breakout": 0.00026024868547864756,
+      "breakout_up_eval": {
+        "n_is_breakout_up": 40,
+        "n_breakout_up": 40,
+        "ret_1_mean": -4.805306463998193e-05,
+        "ret_1_winrate": 0.358974358974359,
+        "ret_1_sharpe": -0.07156026042098168,
+        "ret_3_mean": 5.519730368464705e-05,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 14,
+            "mean_ret_1": 0.00019188304245507784,
+            "winrate_ret_1": 0.42857142857142855
+          },
+          {
+            "bucket": "mid",
+            "n": 13,
+            "mean_ret_1": -0.0002880147358556238,
+            "winrate_ret_1": 0.23076923076923078
+          },
+          {
+            "bucket": "high",
+            "n": 12,
+            "mean_ret_1": -6.802004576727302e-05,
+            "winrate_ret_1": 0.4166666666666667
+          }
+        ],
+        "monotonic_low_mid_high": false
+      }
+    },
+    "warnings": [
+      "breakout: JSONL has no is_breakout_up / breakout_up_raw; using close > max(prev closes, W=20) proxy (not rolling HIGH)",
+      "breakout: trap_detection_rate weak (0.053 on 19 adverse breakouts)",
+      "breakout_up_eval table: low: n=14, mean=0.00019188304245507784, win=0.42857142857142855 | mid: n=13, mean=-0.0002880147358556238, win=0.23076923076923078 | high: n=12, mean=-6.802004576727302e-05, win=0.4166666666666667"
+    ],
+    "errors": [
+      "breakout: no significant difference in forward returns (p=0.1533 >= 0.05)",
+      "breakout_up_eval: monotonic check failed on raw-breakout strength buckets (require high > mid > low on mean ret_1)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": null,
+      "mean_fwd_price_up_oi_down": 0.00038859183526180507,
+      "n_price_up_oi_up": 0,
+      "n_price_up_oi_down": 103,
+      "pu_oiu_vs_oid_mannwhitney_p": null,
+      "basis_bucket_counts": {
+        "low": 70,
+        "mid": 69,
+        "high": 66
+      },
+      "basis_bucket_mean_fwd": {
+        "low": 0.0005084022845755288,
+        "mid": 0.0005987696675653416,
+        "high": -2.2324927610892238e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: insufficient price↑ splits (PU_OIU=0, PU_OID=103, min=5)"
+    ]
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "n_samples": 205,
+      "pearson_r": 0.09107350578774055,
+      "pearson_p": 0.1940464512719684,
+      "spearman_rho": 0.13377312043065312,
+      "spearman_p": 0.05584652505841453,
+      "bucket_mean_fwd": {
+        "low": 0.0003125462492225089,
+        "mid": 5.701624767641003e-05,
+        "high": 0.0007351033194357014
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring: Pearson correlation not significant (r=0.0911, p=0.1940)",
+      "scoring: bucket mean forward returns not monotonic low→mid→high: [0.0003125462492225089, 5.701624767641003e-05, 0.0007351033194357014]"
+    ]
+  },
+  "adaptive": {
+    "passed": true,
+    "metrics": {
+      "n_closed_trades": 7,
+      "early": {
+        "pnl_sum": 1.900000000000091,
+        "winrate": 0.6666666666666666,
+        "sharpe_proxy": 0.553580719410697
+      },
+      "late": {
+        "pnl_sum": 12.000000000000227,
+        "winrate": 0.75,
+        "sharpe_proxy": 1.0790250018984362
+      },
+      "mannwhitney_early_late_pnl_p": 0.4
+    },
+    "warnings": [],
+    "errors": []
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "decisions_path": "reports\\ttm_parallel_decisions_VN30F1M_20260408.jsonl",
+    "trades_path": "reports\\ttm_parallel_trades_VN30F1M_20260408.jsonl",
+    "closes_path": "reports\\closes_VN30F1M_20260408_reconstructed_209.json",
+    "n_decisions": 209,
+    "n_bars_close": 209,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_0907.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_0918.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_0926.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_1052.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260408_1331.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_0907.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_0918.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_0926.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_1052.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260408_1331.jsonl"
+    ],
+    "decision_files_count": 5,
+    "trade_files_count": 5,
+    "paired_files_count": 5,
+    "bar_offset_final": 209
+  }
+}
