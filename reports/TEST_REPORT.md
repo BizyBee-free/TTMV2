@@ -5487,3 +5487,39 @@ python scripts/backtest.py --suite all --no-fetch
 - No overlapping entries when flat
 - Risk manager correctly gated orders
 
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-19 22:44]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 0m 10s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
