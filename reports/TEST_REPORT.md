@@ -2,7 +2,7 @@
 
 > **Project:** BeeTrade - Algorithmic Trading cho DNSE OpenAPI
 > **Bắt đầu:** 2026-03-24
-> **Cập nhật lần cuối:** 2026-04-19 (TTM V2 `effective_strength` calibration layer)
+> **Cập nhật lần cuối:** 2026-04-21 (TTM paper-live validation 2026-04-20 -> 2026-04-21)
 > **Tổng test cases:** 299+ unit tests (see sections below) + 1 live stress test
 > **Trạng thái tổng thể:** ✅ ON TRACK
 
@@ -5525,6 +5525,62 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## Paper-live validation -- TTM 2026-04-20 to 2026-04-21
+
+**Ngày test:** 2026-04-21  
+**Script / dữ liệu:** `scripts/ttm_merge_multiday_closes.py`, `scripts/ttm_validation.py`, `reports/ttm_parallel_decisions_VN30F1M_20260420_0656.jsonl`, `reports/ttm_parallel_trades_VN30F1M_20260420_0656.jsonl`, `reports/ttm_parallel_decisions_VN30F1M_20260421_0730.jsonl`, `reports/ttm_parallel_trades_VN30F1M_20260421_0730.jsonl`  
+**Loại test:** Paper live / multiday validation  
+**Kết quả tổng:** `overall_valid = false`
+
+### Phương pháp / Evidence
+
+- Merge closes thật theo đúng thứ tự 2 phiên:
+  `python scripts/ttm_merge_multiday_closes.py --start-date 20260420 --end-date 20260421 --out reports/closes_VN30F1M_20260420_20260421_merged.json`
+- Chạy validate:
+  `python scripts/ttm_validation.py --aggregate-start-date 20260420 --aggregate-end-date 20260421 --reports-dir reports --cache-dir data/cache --symbol VN30F1M --closes reports/closes_VN30F1M_20260420_20260421_merged.json --scoring-mode all --json-out reports/ttm_validation_VN30F1M_20260420_20260421_paper_scoring_all.json`
+- Dữ liệu hợp lệ: `486` bars, `22` closed trades V2, `close_missing_ratio = 0.0`, `zero_return_ratio = 0.0309`
+
+### Kết quả các block validate
+
+| Block | Kết quả | Số liệu chính |
+|-------|---------|---------------|
+| Breakout | ✅ PASS | `n_valid_breakout_up_bars = 29`, `strength_axis = effective_strength`, bucket mean `low=0.000537`, `mid=0.000616`, `high=0.000736`, monotonic = `true` |
+| Positioning | ❌ FAIL | `PU_OIU vs PU_OID p = 0.3088` (không đủ khác biệt thống kê) |
+| Scoring LONG | ❌ FAIL | Pearson `r = 0.0789`, `p = 0.0836`; bucket aligned return `low=-7.47e-05`, `mid=1.14e-04`, `high=4.20e-05` |
+| Scoring SHORT | ❌ FAIL | chỉ có `5` samples `< 20`, chưa đủ lực kết luận |
+| Adaptive | ✅ PASS | `22` closed trades, nhưng early/late đều âm |
+
+### Đánh giá riêng lẻ TTM V2
+
+| Nhóm | Trades | PnL | Win rate | Avg return | Sharpe proxy | PF | Avg hold | Hold=1 bar |
+|------|--------|-----|----------|------------|--------------|----|----------|------------|
+| V2 tổng | 22 | `-8.4` | `18.18%` | `-0.000204` | `-0.384` | `0.468` | `2.0` | `50.0%` |
+| V2 LONG | 17 | `-9.7` | `11.76%` | `-0.000258` | `-0.514` | `0.242` | `2.18` | `41.18%` |
+| V2 SHORT | 5 | `+1.3` | `40.0%` | `-0.000021` | `-0.035` | `1.433` | `1.4` | `80.0%` |
+
+### Phát hiện quan trọng
+
+- Breakout validator đã đọc đúng trục mới: `breakout_up_eval.strength_axis = effective_strength`, và bucket breakout hiện **monotonic** trên sample này.
+- Tuy nhiên calibration layer hiện **chưa thực sự hoạt động** trong 2 phiên này: trên `483` rows có cả `raw_strength` và `effective_strength`, số row khác nhau là `0`; trên `36` breakout-up rows, số row khác nhau cũng là `0`. Điều này phù hợp với config mặc định `ttm_v2_effective_strength_k_extension = 0` và `ttm_v2_effective_strength_k_lastret = 0`.
+- LONG side là điểm yếu chính: lỗ `-9.7`, PF chỉ `0.242`, Sharpe proxy `-0.514`, và scoring_long vẫn có dạng `mid > high`.
+- SHORT side tốt hơn LONG ở trade-level (PnL dương, PF > 1), nhưng sample còn rất nhỏ (`5` trades) nên chưa đủ cơ sở tối ưu.
+- `holding_period = 1` của V2 tổng là `50%`; riêng LONG đã xuống `41.18%`, nhưng SHORT vẫn `80%`, cho thấy short exhaustion còn thoát rất sớm / chưa bền.
+
+### Điểm cần cải thiện
+
+1. **Bật calibration thật sự trên paper-live** bằng cách tune `ttm_v2_effective_strength_k_extension` trước; hiện tại `effective_strength == raw_strength`, nên refactor mới chỉ đổi plumbing/logging chứ chưa đổi ranking thực tế.
+2. **Ưu tiên sửa LONG scoring**, không phải breakout gate: breakout đã pass, nhưng `score_long` vẫn không tạo tương quan đủ mạnh với forward return.
+3. **Thu thập thêm mẫu SHORT** trước khi kết luận; với `5` trades hiện tại thì short alpha mới chỉ là tín hiệu tích cực ban đầu.
+4. **Theo dõi song song 3 chỉ số sau khi tune k1/k2:**  
+   `effective_strength != raw_strength`, `hold_1bar_pct` giảm thêm, và `scoring_long` bucket chuyển từ `mid > high` sang `high > mid > low`.
+
+### Khuyến nghị cho PM
+
+- Không nên tối ưu adaptive ở thời điểm này; adaptive chỉ nên bật/tune tiếp sau khi `scoring_long` ổn hơn và calibration `effective_strength` đã được kích hoạt bằng `k1/k2 > 0`.
+- Vòng tiếp theo nên là grid nhỏ cho `k_extension` trên paper replay / paper live ngắn hạn, giữ `k_lastret = 0` ở bước đầu để cô lập tác động của `extension`.
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-20 15:19]
 
 ### Configuration
@@ -5551,6 +5607,48 @@ python scripts/backtest.py --suite all --no-fetch
 | Metric | Value |
 |--------|-------|
 | Duration | 502m 31s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-21 16:06]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 33517 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 516m 35s |
 | Signals generated | 0 |
 | Orders placed | 0 |
 | Paper fills | 0 |
