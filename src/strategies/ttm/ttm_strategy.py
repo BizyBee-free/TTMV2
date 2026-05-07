@@ -263,19 +263,8 @@ class TTMDerivativesStrategy(StrategyBase):
             return None
 
         if action in ("LONG", "SHORT"):
-            feat = sig.get("features") if isinstance(sig.get("features"), dict) else {}
-            strength_key = "short_score" if action == "SHORT" else "breakout_strength"
-            brk = float(feat.get(strength_key, 0.0) or 0.0)
             base_size = max(1.0, float(self._position_size))
-            strength_scale = max(1e-9, float(self._ttm.config.get("ttm_v2_strength_scale", 1.0)))
-            size_mult = float(np.clip(brk / strength_scale, 0.5, 1.5))
-            vol_z = float(feat.get("vol_zscore", feat.get("vol_z", 0.0)) or 0.0)
-            k_vol = float(self._ttm.config.get("ttm_v2_position_size_vol_k", 0.25))
-            vol_part = (
-                1.0 + k_vol * float(np.tanh(vol_z)) if np.isfinite(vol_z) else 1.0
-            )
-            size_mult = float(size_mult * vol_part)
-            qty = max(1, int(round(base_size * size_mult)))
+            qty = max(1, int(round(base_size)))
             self._pending_entry = {
                 "action": action,
                 "confidence": conf,

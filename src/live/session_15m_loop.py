@@ -171,6 +171,14 @@ def run_15m_session_loop(
         )
         try:
             result = runner.run_once(symbol=symbol, days_back=days_back, submit_order=submit)
+            try:
+                if hasattr(runner, "ops_after_session_tick"):
+                    runner.ops_after_session_tick()
+            except Exception as ex:
+                session_logger.warning(
+                    "ops_after_session_tick failed",
+                    extra={"strategy_algo": algo, "error": str(ex)},
+                )
         except Exception as e:
             session_logger.exception(
                 f"{algo} session tick crashed",
@@ -191,6 +199,11 @@ def run_15m_session_loop(
             time.sleep(duplicate_retry_seconds)
             try:
                 retry = runner.run_once(symbol=symbol, days_back=days_back, submit_order=submit)
+                try:
+                    if hasattr(runner, "ops_after_session_tick"):
+                        runner.ops_after_session_tick()
+                except Exception:
+                    pass
                 print(
                     f"  retry ok={retry.ok} detail={retry.detail} dir={retry.direction} "
                     f"label={retry.state_label} order={retry.order_id}",

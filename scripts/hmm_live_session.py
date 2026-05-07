@@ -19,6 +19,7 @@ Examples::
 from __future__ import annotations
 
 import argparse
+import atexit
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -194,7 +195,9 @@ def main() -> int:
         runner = TtmLiveRunner(settings=settings)
     else:
         runner = HmmLiveRunner(settings=settings)
-    if args.telegram_control:
+    if getattr(settings, "OPS_ENABLED", False) and hasattr(runner, "stop_ops"):
+        atexit.register(runner.stop_ops)
+    if args.telegram_control and not getattr(settings, "OPS_ENABLED", False):
         TelegramControlBot(runner.risk, runner.notifier, settings=settings).start_background()
 
     params = Session15mLoopParams(

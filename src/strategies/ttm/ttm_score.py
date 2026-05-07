@@ -164,67 +164,53 @@ def compute_score_v2_alpha(
         feats.get("effective_strength"), np.ndarray
     )
     eff_slice = _v2_feat_slice(feats, "effective_strength", n) if use_eff else None
-    brk_for_long = eff_slice if eff_slice is not None else brk
-    long_breakout = np.where(bu, brk_for_long, 0.0)
+    raw_strength = _v2_feat_slice(feats, "raw_strength", n)
+    price_z = _v2_feat_slice(feats, "price_z", n)
+    last_bar_return = _v2_feat_slice(feats, "last_bar_return", n)
+    if eff_slice is None:
+        eff_slice = np.where(bu, brk, 0.0)
+    eff_last = float(eff_slice[bi]) if np.isfinite(eff_slice[bi]) else 0.0
+    bu_last = bool(bu[bi])
+    score_long = float(np.tanh(eff_last)) if bu_last else 0.0
+    alpha_raw_long = eff_last if bu_last else 0.0
+    alpha_rank_long = _percentile_rank_in_window(eff_slice[max(0, n - rank_win) : bi + 1], eff_last)
+
+    # SHORT path remains the dedicated exhaustion leg.
     short_breakout = _v2_feat_slice(feats, "short_score", n)
     short_confirm = _v2_bool_slice(feats, "exhaustion_confirm", n)
     short_breakout = np.where(short_confirm, short_breakout, 0.0)
-
-    k_vol_brk = float(config.get("ttm_v2_vol_breakout_interaction_k", 0.0))
-    v_int_arr = np.ones(n, dtype=np.float64)
-    if abs(k_vol_brk) > 1e-15:
-        vol_z_arr = _v2_feat_slice(feats, "vol_zscore", n)
-        v_int_arr = 1.0 + k_vol_brk * np.tanh(vol_z_arr)
-        long_breakout = long_breakout * v_int_arr
-        short_breakout = short_breakout * v_int_arr
-
     mom = _v2_feat_slice(feats, "momentum_1_z", n)
     basis_mom = _v2_feat_slice(feats, "basis_signal", n)
     if float(np.max(np.abs(basis_mom))) < 1e-12 and "basis_effect" in feats:
         basis_mom = _v2_feat_slice(feats, "basis_effect", n)
-
     short_mom = -mom
     short_basis_mom = -basis_mom
     fwd = _forward_returns_close(close, fwd_h)
     neg_fwd = -fwd
-
-    c1_long = _pearson_corr(long_breakout, fwd, min_n_corr)
-    c2_long = _pearson_corr(mom, fwd, min_n_corr)
-    c3_long = _pearson_corr(basis_mom, fwd, min_n_corr)
     c1_short = _pearson_corr(short_breakout, neg_fwd, min_n_corr)
     c2_short = _pearson_corr(short_mom, neg_fwd, min_n_corr)
     c3_short = _pearson_corr(short_basis_mom, neg_fwd, min_n_corr)
-
-    s1_long = _alignment_factor(c1_long, guard_enabled=sign_guard, flip_max=flip_max)
-    s2_long = _alignment_factor(c2_long, guard_enabled=sign_guard, flip_max=flip_max)
-    s3_long = _alignment_factor(c3_long, guard_enabled=sign_guard, flip_max=flip_max)
     s1_short = _alignment_factor(c1_short, guard_enabled=sign_guard, flip_max=flip_max)
     s2_short = _alignment_factor(c2_short, guard_enabled=sign_guard, flip_max=flip_max)
     s3_short = _alignment_factor(c3_short, guard_enabled=sign_guard, flip_max=flip_max)
-
-    alpha_series_long = w1 * (long_breakout * s1_long) + w2 * (mom * s2_long) + w3 * (basis_mom * s3_long)
     alpha_series_short = (
         w1 * (short_breakout * s1_short)
         + w2 * (short_mom * s2_short)
         + w3 * (short_basis_mom * s3_short)
     )
-    alpha_raw_long = float(alpha_series_long[bi]) if np.isfinite(alpha_series_long[bi]) else 0.0
     alpha_raw_short = float(alpha_series_short[bi]) if np.isfinite(alpha_series_short[bi]) else 0.0
-
     lo = max(0, n - rank_win)
-    alpha_window_long = alpha_series_long[lo : bi + 1]
     alpha_window_short = alpha_series_short[lo : bi + 1]
-    alpha_rank_long = _percentile_rank_in_window(alpha_window_long, alpha_raw_long)
     alpha_rank_short = _percentile_rank_in_window(alpha_window_short, alpha_raw_short)
     use_rank_score = bool(config.get("ttm_v2_use_rank_score", False))
     if use_rank_score:
-        score_long = float(np.clip((2.0 * alpha_rank_long - 1.0) * cap, -cap, cap))
         score_short = float(np.clip((2.0 * alpha_rank_short - 1.0) * cap, -cap, cap))
     else:
-        score_long = float(np.clip(np.tanh(alpha_raw_long) * cap, -cap, cap))
         score_short = float(np.clip(np.tanh(alpha_raw_short) * cap, -cap, cap))
 
-    v_int_last = float(v_int_arr[bi]) if v_int_arr.size > bi else 1.0
+    c1_long = c2_long = c3_long = 0.0
+    s1_long = s2_long = s3_long = 1.0
+    v_int_last = 1.0
     components: Dict[str, float] = {
         "alpha_raw": alpha_raw_long,
         "alpha_rank": float(alpha_rank_long),
@@ -257,9 +243,12 @@ def compute_score_v2_alpha(
         "w_breakout": w1,
         "w_momentum": w2,
         "w_basis": w3,
-        "breakout_signed_last": float(long_breakout[bi] - short_breakout[bi]),
-        "breakout_long_last": float(long_breakout[bi]),
+        "breakout_signed_last": float(eff_last - short_breakout[bi]),
+        "breakout_long_last": float(eff_last),
         "effective_strength_last": float(eff_slice[bi]) if eff_slice is not None else float(brk[bi]),
+        "raw_strength_last": float(raw_strength[bi]),
+        "price_z_last": float(price_z[bi]),
+        "last_bar_return_last": float(last_bar_return[bi]),
         "breakout_short_last": float(short_breakout[bi]),
         "price_momentum_last": float(mom[bi]),
         "basis_mom_last": float(basis_mom[bi]),

@@ -2,8 +2,8 @@
 
 > **Project:** BeeTrade - Algorithmic Trading cho DNSE OpenAPI
 > **Bắt đầu:** 2026-03-24
-> **Cập nhật lần cuối:** 2026-04-21 (TTM paper-live validation 2026-04-20 -> 2026-04-21)
-> **Tổng test cases:** 299+ unit tests (see sections below) + 1 live stress test
+> **Cập nhật lần cuối:** 2026-05-07 (Operations / control layer `src/ops`)
+> **Tổng test cases:** 299+ unit tests + 18 ops tests (see sections below) + 1 live stress test
 > **Trạng thái tổng thể:** ✅ ON TRACK
 
 ---
@@ -20,6 +20,25 @@
 6c. [Config-driven derivative exit rules](#6c-config-driven-derivative-exit-rules-2026-03-31)
 7. [Giai đoạn 4 -- Backtest Framework](#7-giai-đoạn-4----backtest-framework-mcmc-strategy-validation)
 8. [Quy ước báo cáo test](#8-quy-ước-báo-cáo-test)
+
+---
+
+## Operations / control layer (`src/ops`)
+
+**Ngày test:** 2026-05-07  
+**Files:** `tests/test_ops_*.py` (6 files)  
+**Kết quả:** 18/18 PASS (mock Telegram / HTTP)
+
+| # | Module / focus | Kết quả |
+|---|----------------|---------|
+| 1 | `test_ops_telegram_alerts.py` — masking, disabled safe send, 5s timeout | ✅ PASS |
+| 2 | `test_ops_control_state.py` — defaults, resume, pause, kill | ✅ PASS |
+| 3 | `test_ops_telegram_control.py` — /pause, /resume, /flatten & /kill need CONFIRM | ✅ PASS |
+| 4 | `test_ops_otp_manager.py` — pending gate, chat whitelist, mask | ✅ PASS |
+| 5 | `tests/test_ops_order_monitor.py` — ack timeout → critical + pause hook | ✅ PASS |
+| 6 | `test_ops_integration.py` — `TradingTokenManager` OTP provider, ops vs TTM isolation | ✅ PASS |
+
+**Lệnh:** `python -m pytest tests/test_ops_telegram_alerts.py tests/test_ops_control_state.py tests/test_ops_telegram_control.py tests/test_ops_otp_manager.py tests/test_ops_order_monitor.py tests/test_ops_integration.py -v`
 
 ---
 
@@ -602,6 +621,7 @@ Từ Giai đoạn 2 trở đi, mọi test đều phải được ghi vào report
 | GĐ3b: Paper Engine    | \ est_paper_engine.py\                                                                 | 18      | 18      | 0     | LO fill logic, slippage, ATC                                            |
 | GĐ3b: MCMC Strategy   | \ est_mcmc_strategy.py\                                                                | 19      | 19      | 0     | Signals, cooldown, T0 force close                                       |
 | TTM breakout refactor | `test_ttm_parallel_runner.py`, `test_ttm_volume_features.py`, `test_ttm_validation.py` | 12      | 11      | 0     | Breakout continuation-only gate, exhaustion snapshot, validation filter |
+| TTM V2 scoring purity | `test_ttm_effective_strength.py`, `test_ttm_v2_alpha.py`, `test_ttm_parallel_runner.py`, `test_ttm_validation.py` | 18+     | —       | 0     | LONG `score_long` gated on `breakout_up`; `effective_strength` ungated at feature layer; validate breakout axis = `raw_strength`; scoring domain masks |
 | **Tổng unit tests**   |                                                                                        | **184** | **184** | **0** |                                                                         |
 | Live: Rate Limit      | ate_limit_test.py\                                                                     | 1       | -       | -     | DNSE API rate limit discovery                                           |
 | Live: Paper Test      | \paper_test.py\                                                                        | -       | -       | -     | MCMC paper session (market hours)                                       |
@@ -5526,6 +5546,41 @@ python scripts/backtest.py --suite all --no-fetch
 
 ---
 
+## Unit Tests -- TTM V2 LONG scoring purity [2026-04-23]
+
+**Ngày test:** 2026-04-23  
+**File test:** `tests/test_ttm_effective_strength.py`, `tests/test_ttm_v2_alpha.py`, `tests/test_ttm_parallel_runner.py`, `tests/test_ttm_validation.py`  
+**Lệnh:** `python -m pytest tests/test_ttm_effective_strength.py tests/test_ttm_v2_alpha.py tests/test_ttm_parallel_runner.py tests/test_ttm_validation.py -q --tb=line`  
+**Kết quả:** 16 PASS / 16 RUN, 1 SKIP
+
+### Kết quả chính
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | `test_effective_strength_penalizes_extension_and_late_entry` | `test_ttm_effective_strength.py` | Công thức `effective_strength` = pre_gate mọi nơi có `raw_strength` hữu hạn; `effective_strength_active` == `breakout_up` | ✅ PASS |
+| 2 | `test_compute_score_v2_alpha_reads_effective_strength_key` | `test_ttm_effective_strength.py` | LONG score đọc trực tiếp `effective_strength` | ✅ PASS |
+| 3 | `test_v2_alpha_component_keys` | `test_ttm_v2_alpha.py` | Component LONG/SHORT còn đầy đủ key debug bắt buộc | ✅ PASS |
+| 4 | `test_v2_short_score_uses_dedicated_exhaustion_leg` | `test_ttm_v2_alpha.py` | SHORT exhaustion leg giữ nguyên sau refactor LONG | ✅ PASS |
+| 5 | `test_parallel_runner_jsonl_and_summary` | `test_ttm_parallel_runner.py` | Snapshot JSONL còn đủ trường score/features chính | ✅ PASS |
+| 6 | `test_breakout_validation_skips_exhaustion_candidates` | `test_ttm_validation.py` | Breakout validation pipeline vẫn hoạt động | ✅ PASS |
+
+### Đánh giá
+
+- LONG scoring path đã được tinh giản theo mục tiêu signal purity: loại bỏ legacy blend khỏi `score_long`, chuyển về transform đơn điệu của `effective_strength`.
+- Execution sizing V2 được cố định để giảm nhiễu từ scaling theo `breakout_strength/short_score` và vol.
+- SHORT exhaustion path vẫn chạy ổn theo regression tests hiện có.
+- Cảnh báo còn lại là `DeprecationWarning` websocket và `ConstantInputWarning` trên dữ liệu synthetic trong `test_ttm_validation.py` (không phải regression chức năng).
+
+### Cập nhật kiến trúc validate vs decision [2026-05-01]
+
+- **Breakout validate:** trục bucket / monotonic = `features.raw_strength` (không dùng `effective_strength`).
+- **Feature `effective_strength`:** không zero ở feature layer; công thức giữ nguyên.
+- **`score_long`:** chỉ `tanh(effective_strength)` khi `breakout_up`; ngoài đó `0.0`.
+- **Scoring validate:** LONG chỉ trên domain `breakout_up_filtered_last` (fallback: raw up + không exhaustion + `raw_strength` > 0); SHORT chỉ khi `exhaustion_confirm`.
+- **Trade trace:** regression `test_v2_exit_trade_rows_include_entry_trace_fields` (skip nếu replay không có CLOSED V2).
+
+---
+
 ## Paper-live validation -- TTM 2026-04-20 to 2026-04-21
 
 **Ngày test:** 2026-04-21  
@@ -5649,6 +5704,462 @@ python scripts/backtest.py --suite all --no-fetch
 | Metric | Value |
 |--------|-------|
 | Duration | 516m 35s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-22 15:06]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 34769 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 441m 41s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-23 15:02]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 36567 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 465m 24s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-23 19:40]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 12m 31s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-24 15:05]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 32253 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 443m 55s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-28 09:16]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 93m 39s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-28 14:57]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 339m 50s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-29 09:38]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 35186 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 112m 47s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-04-29 15:03]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 324m 54s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-04 15:24]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 35421 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 480m 55s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-05 14:50]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 36593 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 413m 41s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-06 14:55]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 39692 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 425m 36s |
 | Signals generated | 0 |
 | Orders placed | 0 |
 | Paper fills | 0 |

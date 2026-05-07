@@ -334,6 +334,77 @@ class TradingClient:
         )
         await self._send_dict(msg, "SUB_EXPECTED_PRICE")
 
+    async def _read_until_reconnect_auth_success(self) -> None:
+        """Đọc frame sau AUTH(reconnect) cho đến ``auth_success``.
+
+        Gateway đôi khi trả ``NOT_AUTHENTICATED`` (race / thứ tự) trước ``auth_success``.
+        Chỉ đọc một ``receive()`` sẽ raise sớm → không gọi ``_replay_all_subscriptions``,
+        kết nối vẫn sống nhưng mất market stream.
+        """
+        from .exceptions import AuthenticationError as _AuthErr
+
+        transient_na = 0
+        max_transient_na = 6
+        for _ in range(48):
+            raw = await self._connection.receive()
+            self._raw_recv_count += 1
+            self._log_raw_frame("RAW_WS(reconnect_auth)", raw)
+            try:
+                decoded = self._decoder.decode(raw)
+            except Exception:
+                continue
+            batch = decoded if isinstance(decoded, list) else [decoded]
+            for item in batch:
+                if not isinstance(item, dict):
+                    continue
+                ract = str(item.get("action") or item.get("Action") or "").lower()
+                if ract == "auth_success":
+                    self._session_id = (
+                        item.get("session_id")
+                        or item.get("SessionId")
+                        or self._session_id
+                    )
+                    logger.info("Reconnect WebSocket auth_success")
+                    return
+                if ract == "ping":
+                    await self._send_dict({"action": "pong"}, "PONG_REPLY")
+                    continue
+                if ract == "pong":
+                    continue
+                if ract in ("auth_error",):
+                    raise _AuthErr(f"Reconnect auth failed: {item}")
+                if ract == "error":
+                    code = str(item.get("code") or "").upper()
+                    msg_l = str(item.get("message") or "").lower()
+                    if code == "NOT_AUTHENTICATED" or "authenticate first" in msg_l:
+                        transient_na += 1
+                        if transient_na > max_transient_na:
+                            raise _AuthErr(
+                                f"Reconnect auth failed (too many NOT_AUTHENTICATED): {item}"
+                            )
+                        logger.warning(
+                            "Reconnect: transient NOT_AUTHENTICATED (%s/%s); awaiting auth_success",
+                            transient_na,
+                            max_transient_na,
+                        )
+                        continue
+                    raise _AuthErr(f"Reconnect auth failed: {item}")
+                if str(item.get("status") or "").lower() == "error":
+                    raise _AuthErr(f"Reconnect auth failed: {item}")
+        raise _AuthErr("Reconnect auth: no auth_success within read budget")
+
+    async def _on_auth_success_maybe_replay(self) -> None:
+        """Sau auth_success, gửi lại subscription (an toàn khi frame lẻ không qua handshake reconnect)."""
+        try:
+            await self._replay_all_subscriptions()
+        except Exception as sub_ex:
+            logger.error(f"Re-subscribe after auth_success failed: {sub_ex}", exc_info=True)
+            print(
+                f"[dnse-ws] Re-subscribe after auth_success failed: {sub_ex}",
+                file=sys.stderr,
+                flush=True,
+            )
+
     async def _replay_all_subscriptions(self) -> None:
         """Sau reconnect phải subscribe lại; nếu không, ws_frames tăng nhưng không có quote/OHLC."""
         did = False
@@ -639,6 +710,14 @@ class TradingClient:
                         self._rx_frame_count += 1
                         self._log_decoded_summary(item)
                         act_low = str(item.get("action") or item.get("Action") or "").lower()
+                        if act_low == "auth_success":
+                            self._session_id = (
+                                item.get("session_id")
+                                or item.get("SessionId")
+                                or self._session_id
+                            )
+                            await self._on_auth_success_maybe_replay()
+                            continue
                         if act_low == "ping":
                             if self._pipeline_debug:
                                 print("PING RECEIVED (server → client)", flush=True)
@@ -661,6 +740,14 @@ class TradingClient:
                 self._rx_frame_count += 1
                 self._log_decoded_summary(decoded)
                 act_low = str(decoded.get("action") or decoded.get("Action") or "").lower()
+                if act_low == "auth_success":
+                    self._session_id = (
+                        decoded.get("session_id")
+                        or decoded.get("SessionId")
+                        or self._session_id
+                    )
+                    await self._on_auth_success_maybe_replay()
+                    continue
                 if act_low == "ping":
                     if self._pipeline_debug:
                         print("PING RECEIVED (server → client)", flush=True)
@@ -683,19 +770,7 @@ class TradingClient:
                         self._session_id = welcome.get("session_id") or welcome.get("SessionId")
                         auth_msg = self._auth.create_auth_message()
                         await self._send_dict(auth_msg, "AUTH(reconnect)")
-                        response = await self._connection.receive()
-                        self._raw_recv_count += 1
-                        self._log_raw_frame("RAW_WS(reconnect_auth)", response)
-                        decoded = self._decoder.decode(response)
-                        ract = str(decoded.get("action") or decoded.get("Action") or "").lower()
-                        if ract in ("auth_error", "error"):
-                            from .exceptions import AuthenticationError as _AuthErr
-                            raise _AuthErr(f"Reconnect auth failed: {decoded}")
-                        self._session_id = (
-                            decoded.get("session_id")
-                            or decoded.get("SessionId")
-                            or self._session_id
-                        )
+                        await self._read_until_reconnect_auth_success()
                         self._tick_last_sent = {}
                         self._top_price_last_sent = {}
                         self._sec_def_last_sent = {}

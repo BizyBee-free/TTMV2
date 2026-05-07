@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 from src.api_health import ApiHealthMonitor
 from src.balance_utils import validate_balance_response
@@ -44,6 +44,7 @@ from src.strategies.ttm.config import TTM_CONFIG
 from src.strategies.ttm.session_flatten import session_flatten_bar_unix_ts
 from src.strategies.ttm.ttm_strategy import TTMState, TTMStrategy
 from src.strategies.ttm.ttm_v2_short import build_exhaustion_short_entry_meta, check_exhaustion_short_exit
+from src.ops.ops_controller import OpsController
 from src.telegram_notifier import TelegramNotifier
 from src.vn_time import unix_ts_to_vn_str
 
@@ -80,7 +81,11 @@ class TtmLiveRunner:
         state_path: Optional[Path] = None,
     ) -> None:
         self._settings = settings or get_settings()
-        self._client = client or BeeTradeClient(self._settings)
+        self._ops: Optional[OpsController] = None
+        if self._settings.OPS_ENABLED:
+            self._ops = OpsController(settings=self._settings, runner=self)
+        _otp = self._ops.otp_provider if self._ops else None
+        self._client = client or BeeTradeClient(self._settings, otp_provider=_otp)
         self._fetcher = fetcher or DataFetcher(settings=self._settings)
         self._state_path = state_path or (
             Path(__file__).resolve().parent.parent.parent / "data" / "ttm_live_state.json"
@@ -98,6 +103,13 @@ class TtmLiveRunner:
         self._orders.on_fill(self._tracker.on_fill)
         self._orders.on_fill(self._on_fill)
 
+        self._last_ops_bar_ts: Optional[int] = None
+        self._last_ops_rt_ts: Optional[float] = None
+        if self._ops:
+            self._ops.attach_runner(self)
+            self._ops.register_order_callbacks(self._orders)
+            self._ops.start()
+
         self._risk.on_halt(self._on_halt)
         self._api_health.on_halt(self._risk.halt)
 
@@ -113,6 +125,52 @@ class TtmLiveRunner:
     @property
     def notifier(self) -> TelegramNotifier:
         return self._notifier
+
+    @property
+    def ops(self) -> Optional[OpsController]:
+        return self._ops
+
+    def ops_after_session_tick(self) -> None:
+        if self._ops:
+            self._ops.after_run_tick(
+                bar_unix_ts=self._last_ops_bar_ts,
+                rt_tick_ts=self._last_ops_rt_ts,
+            )
+
+    def stop_ops(self) -> None:
+        if self._ops:
+            self._ops.stop()
+
+    def _ops_before_submit(
+        self,
+        req: OrderRequest,
+        *,
+        opening_new: bool,
+    ) -> Optional[LiveStepResult]:
+        if not self._ops:
+            return None
+        if not self._ops.control_state.can_send_order():
+            self._ops.on_order_blocked(req, "can_send_order")
+            return LiveStepResult(
+                ok=False,
+                detail="ops_blocked:cannot_send_order",
+                root_cause=_root_cause_from_detail("ops_blocked"),
+            )
+        if opening_new and not self._ops.control_state.can_open_new_position():
+            self._ops.on_order_blocked(req, "can_open_new_position")
+            return LiveStepResult(
+                ok=False,
+                detail="ops_blocked:cannot_open_new_position",
+                root_cause=_root_cause_from_detail("ops_blocked"),
+            )
+        return None
+
+    def _ops_after_submit(self, order: ManagedOrder, req: OrderRequest) -> None:
+        if not self._ops:
+            return
+        self._ops.on_order_submitted(order, req)
+        if order.status == OrderStatus.REJECTED:
+            self._ops.on_order_terminal(order)
 
     def _on_halt(self, reason: str) -> None:
         self._notifier.send_alert("CRITICAL", "HALT", reason)
@@ -276,6 +334,7 @@ class TtmLiveRunner:
             if rt.get("status") == 200:
                 rt_price, rt_ts = _parse_latest_trade(rt.get("data"))
                 if rt_price is not None and rt_ts is not None:
+                    self._last_ops_rt_ts = float(rt_ts)
                     rt_index_price = None
                     if index_closes is not None and self._settings.HMM_USE_BASIS:
                         rt_index_price = fetch_latest_index_price(
@@ -310,6 +369,7 @@ class TtmLiveRunner:
             logger.warning("[TTM Live] realtime merge failed", extra={"error": str(e)})
 
         last_ts = bars[-1].unix_ts
+        self._last_ops_bar_ts = int(last_ts) if last_ts else None
         bar_utc = datetime.fromtimestamp(int(last_ts), tz=timezone.utc).isoformat() if last_ts else ""
         now_utc = datetime.now(timezone.utc)
         age_sec = int(now_utc.timestamp() - int(last_ts)) if last_ts else 0
@@ -677,7 +737,12 @@ class TtmLiveRunner:
         if not allowed:
             return LiveStepResult(ok=False, detail=rreason, root_cause=_root_cause_from_detail(rreason))
 
+        blocked = self._ops_before_submit(req, opening_new=True)
+        if blocked is not None:
+            return blocked
+
         order = self._orders.submit(req)
+        self._ops_after_submit(order, req)
         if order.status == OrderStatus.REJECTED:
             return LiveStepResult(
                 ok=False,
@@ -766,7 +831,12 @@ class TtmLiveRunner:
         if not allowed:
             return LiveStepResult(ok=False, detail=rreason, root_cause=_root_cause_from_detail(rreason))
 
+        blocked = self._ops_before_submit(req, opening_new=True)
+        if blocked is not None:
+            return blocked
+
         order = self._orders.submit(req)
+        self._ops_after_submit(order, req)
         if order.status == OrderStatus.REJECTED:
             return LiveStepResult(
                 ok=False,
@@ -865,7 +935,12 @@ class TtmLiveRunner:
         if not allowed:
             return LiveStepResult(ok=False, detail=rreason, root_cause=_root_cause_from_detail(rreason))
 
+        blocked = self._ops_before_submit(req, opening_new=True)
+        if blocked is not None:
+            return blocked
+
         order = self._orders.submit(req)
+        self._ops_after_submit(order, req)
         if order.status == OrderStatus.REJECTED:
             return LiveStepResult(
                 ok=False,
@@ -956,7 +1031,12 @@ class TtmLiveRunner:
         if not allowed:
             return LiveStepResult(ok=False, detail=rreason, root_cause=_root_cause_from_detail(rreason))
 
+        blocked = self._ops_before_submit(req, opening_new=False)
+        if blocked is not None:
+            return blocked
+
         order = self._orders.submit(req)
+        self._ops_after_submit(order, req)
         if order.status == OrderStatus.REJECTED:
             return LiveStepResult(
                 ok=False,

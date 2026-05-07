@@ -752,6 +752,32 @@ class Settings(BaseSettings):
         default="",
         description="Comma-separated chat ids allowed for /pause /resume (empty = same as CHAT_ID)",
     )
+    TELEGRAM_ALLOWED_CHAT_ID: str = Field(
+        default="",
+        description="Single ops/control chat id (whitelist + outbound fallback when TELEGRAM_CHAT_ID empty)",
+    )
+
+    # --- Operations / control layer (non-strategy) ---
+    OPS_ENABLED: bool = Field(default=False, description="Master switch for ops wrapper (audit, gates, monitors).")
+    CONTROL_ENABLED: bool = Field(default=True, description="Telegram control bot thread when OPS_ENABLED.")
+    CONTROL_TRADE_ENABLED_DEFAULT: bool = Field(
+        default=False,
+        description="If true, persist initial control_state with trade_enabled=true (still respects kill/pause).",
+    )
+    ORDER_MONITOR_ENABLED: bool = Field(default=True)
+    HEALTH_MONITOR_ENABLED: bool = Field(default=True)
+    OTP_TELEGRAM_ENABLED: bool = Field(
+        default=False,
+        description="When true, OTPManager may block on Telegram OTP for trading token.",
+    )
+    DATA_STALE_SEC: int = Field(default=10)
+    BAR_STALE_SEC: int = Field(default=70)
+    DECISION_STALE_SEC: int = Field(default=90)
+    ORDER_ACK_TIMEOUT_SEC: int = Field(default=5)
+    ORDER_FILL_TIMEOUT_SEC: int = Field(default=10)
+    PAUSE_ON_DATA_STALE: bool = Field(default=True)
+    PAUSE_ON_ORDER_TIMEOUT: bool = Field(default=True)
+    AUTO_FLATTEN_ON_CRITICAL: bool = Field(default=False)
 
     # Cached trading token (set at runtime, not from env)
     _trading_token: Optional[str] = None

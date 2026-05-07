@@ -589,9 +589,6 @@ def compute_ttm_features(
     breakout_exhaustion_penalty: float = 0.30,
     breakout_quality_momentum_bonus: float = 0.20,
     positioning_w_oi: float = 0.20,
-    ttm_v2_effective_strength_k_extension: float = 0.0,
-    ttm_v2_effective_strength_k_lastret: float = 0.0,
-    ttm_v2_effective_strength_use_abs_price_z: bool = True,
 ) -> Dict[str, Any]:
     """
     ``data`` keys:
@@ -960,29 +957,34 @@ def compute_ttm_features(
         w_oi=float(positioning_w_oi),
     )
 
-    # --- V2-only calibration inputs (causal): extension from price level z; prior-bar return; effective_strength ---
+    # --- V2 LONG expected-return proxy (causal): raw_strength with extension/late penalties ---
     w_px = max(2, int(breakout_window))
     price_z = rolling_zscore_levels(close, w_px)
-    if bool(ttm_v2_effective_strength_use_abs_price_z):
-        extension = np.abs(np.asarray(price_z, dtype=np.float64))
-    else:
-        extension = np.asarray(price_z, dtype=np.float64).copy()
+    extension = np.asarray(price_z, dtype=np.float64).copy()
     last_bar_return = np.full(n, np.nan, dtype=np.float64)
     for _i in range(2, n):
         c0 = float(close[_i - 2])
         if abs(c0) > 1e-12 and np.isfinite(close[_i - 1]):
             last_bar_return[_i] = (float(close[_i - 1]) - c0) / c0
-    k_ext = float(ttm_v2_effective_strength_k_extension)
-    k_lr = float(ttm_v2_effective_strength_k_lastret)
+    coef_raw = 1.0
+    coef_price_z = 0.5
+    coef_late = 0.5
+    # effective_strength is an ungated feature; LONG gating applies in ttm_score (score_long only).
+    effective_strength_pre_gate = np.full(n, np.nan, dtype=np.float64)
     effective_strength = np.full(n, np.nan, dtype=np.float64)
+    effective_strength_active = np.zeros(n, dtype=bool)
     for _i in range(n):
         rs_i = raw_strength_up[_i]
         if not np.isfinite(rs_i):
             continue
         ext_i = float(extension[_i]) if np.isfinite(extension[_i]) else 0.0
         lb = last_bar_return[_i]
-        pen_ret = k_lr * max(0.0, float(lb)) if np.isfinite(lb) else 0.0
-        effective_strength[_i] = float(rs_i) - k_ext * ext_i - pen_ret
+        late_pen = abs(float(lb)) if np.isfinite(lb) else 0.0
+        eff_i = coef_raw * float(rs_i) - coef_price_z * ext_i - coef_late * late_pen
+        effective_strength_pre_gate[_i] = eff_i
+        effective_strength[_i] = eff_i
+        if bool(breakout_up[_i]):
+            effective_strength_active[_i] = True
 
     result: Dict[str, Any] = {
         "n": n,
@@ -1007,6 +1009,8 @@ def compute_ttm_features(
         "price_z": np.asarray(price_z, dtype=np.float64).copy(),
         "extension": np.asarray(extension, dtype=np.float64).copy(),
         "last_bar_return": last_bar_return,
+        "effective_strength_pre_gate": effective_strength_pre_gate,
+        "effective_strength_active": effective_strength_active,
         "effective_strength": effective_strength,
         "cap": breakout_strength_cap,
         "breakout_up_raw": breakout_up_raw,
@@ -1111,6 +1115,8 @@ def features_last_row(features: Dict[str, Any]) -> Dict[str, Any]:
         "price_z",
         "extension",
         "last_bar_return",
+        "effective_strength_pre_gate",
+        "effective_strength_active",
         "effective_strength",
         "cap",
         "breakout_strength",
@@ -1176,6 +1182,7 @@ def features_last_row(features: Dict[str, Any]) -> Dict[str, Any]:
         "price_z",
         "extension",
         "last_bar_return",
+        "effective_strength_pre_gate",
         "effective_strength",
     ):
         marr = fvm.get(key) if isinstance(fvm, dict) else None
@@ -1329,13 +1336,6 @@ def compute_ttm_features_from_config(raw: Dict[str, Any], config: Mapping[str, A
         breakout_exhaustion_penalty=float(config.get("ttm_breakout_exhaustion_penalty", 0.30)),
         breakout_quality_momentum_bonus=float(config.get("ttm_breakout_quality_momentum_bonus", 0.20)),
         positioning_w_oi=float(config.get("positioning_w_oi", 0.20)),
-        ttm_v2_effective_strength_k_extension=float(
-            config.get("ttm_v2_effective_strength_k_extension", 0.0)
-        ),
-        ttm_v2_effective_strength_k_lastret=float(config.get("ttm_v2_effective_strength_k_lastret", 0.0)),
-        ttm_v2_effective_strength_use_abs_price_z=bool(
-            config.get("ttm_v2_effective_strength_use_abs_price_z", True)
-        ),
     )
 
 

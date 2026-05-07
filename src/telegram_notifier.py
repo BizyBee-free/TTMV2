@@ -20,6 +20,21 @@ def _parse_allowed_chat_ids(raw: str, default_chat: str) -> List[str]:
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def _outbound_chat_id(settings: Settings) -> str:
+    """Default destination for outbound messages."""
+    cid = (settings.TELEGRAM_CHAT_ID or "").strip()
+    if cid:
+        return cid
+    alt = (getattr(settings, "TELEGRAM_ALLOWED_CHAT_ID", None) or "").strip()
+    if alt:
+        return alt
+    allowed = _parse_allowed_chat_ids(
+        getattr(settings, "TELEGRAM_ALLOWED_CHAT_IDS", "") or "",
+        "",
+    )
+    return allowed[0] if allowed else ""
+
+
 class TelegramNotifier:
     """Send messages via https://api.telegram.org/bot<token>/sendMessage."""
 
@@ -32,15 +47,21 @@ class TelegramNotifier:
         return bool(
             s.TELEGRAM_ENABLED
             and s.TELEGRAM_BOT_TOKEN
-            and s.TELEGRAM_CHAT_ID
+            and _outbound_chat_id(s)
         )
 
-    def send_message(self, text: str, chat_id: Optional[str] = None) -> bool:
+    def send_message(
+        self,
+        text: str,
+        chat_id: Optional[str] = None,
+        *,
+        timeout_sec: float = 15.0,
+    ) -> bool:
         """Send plain text. Returns True on HTTP 200 from Telegram."""
         if not self.is_configured:
             logger.debug("Telegram disabled or not configured, skip send")
             return False
-        cid = chat_id or self._settings.TELEGRAM_CHAT_ID
+        cid = chat_id or _outbound_chat_id(self._settings)
         token = self._settings.TELEGRAM_BOT_TOKEN
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         data = urllib.parse.urlencode(
@@ -48,7 +69,7 @@ class TelegramNotifier:
         ).encode("utf-8")
         try:
             req = urllib.request.Request(url, data=data, method="POST")
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
                 ok = resp.status == 200
                 if not ok:
                     logger.warning(
@@ -77,8 +98,11 @@ class TelegramNotifier:
         """Return True if chat_id may send /pause /resume commands."""
         allowed = _parse_allowed_chat_ids(
             self._settings.TELEGRAM_ALLOWED_CHAT_IDS,
-            self._settings.TELEGRAM_CHAT_ID,
+            _outbound_chat_id(self._settings),
         )
+        extra = (getattr(self._settings, "TELEGRAM_ALLOWED_CHAT_ID", None) or "").strip()
+        if extra and extra not in allowed:
+            allowed = [*allowed, extra]
         if not allowed:
             return False
         return str(chat_id).strip() in allowed

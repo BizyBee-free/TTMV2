@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from src.backtest.data_fetcher import OhlcBar
 from src.strategies.ttm.config import TTM_CONFIG
@@ -94,6 +95,32 @@ def test_parallel_runner_jsonl_and_summary(tmp_path: Path) -> None:
         assert "vol_z" in obj and "regime_tag" in obj and "ttm_regime_id" in obj
         if not ps["v2_is_open"]:
             assert ps["v2_side"] is None
+
+
+def test_v2_exit_trade_rows_include_entry_trace_fields(tmp_path: Path) -> None:
+    """CLOSED v2 rows remain traceable to entry_bar_index (and calibration when LONG)."""
+    base = _bars(80)
+    data_series = [
+        {"bars": base[: i + 1], "basis": np.zeros(i + 1), "open_interest": np.linspace(1e5, 1.01e5, i + 1)}
+        for i in range(len(base))
+    ]
+    dec = tmp_path / "dec2.jsonl"
+    trd = tmp_path / "tr2.jsonl"
+    replay_bars(data_series, config={**TTM_CONFIG}, decision_log_path=str(dec), trade_log_path=str(trd))
+    closed_v2: list[dict] = []
+    for line in trd.read_text(encoding="utf-8").strip().splitlines():
+        o = json.loads(line)
+        if o.get("event_type") != "trade" or str(o.get("model", "")).lower() != "v2":
+            continue
+        if str(o.get("event", "")).upper() != "CLOSED":
+            continue
+        closed_v2.append(o)
+    if not closed_v2:
+        pytest.skip("no v2 CLOSED trades in this replay sample")
+    for o in closed_v2:
+        assert "entry_bar_index" in o
+        assert isinstance(o["entry_bar_index"], int)
+        assert o["entry_bar_index"] >= 0
 
 
 def test_parallel_runner_deterministic() -> None:

@@ -5,7 +5,7 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from src.config import Settings, get_settings
 from src.logger import get_logger
@@ -32,8 +32,13 @@ class TradingTokenManager:
       3. Calling create_trading_token() with the passcode
     """
 
-    def __init__(self, sdk_client: DNSEClient):
+    def __init__(
+        self,
+        sdk_client: DNSEClient,
+        otp_provider: Optional[Callable[[], Optional[str]]] = None,
+    ):
         self._client = sdk_client
+        self._otp_provider = otp_provider
         self._token: Optional[str] = None
         self._token_time: float = 0
         self._token_ttl: float = 3600  # assume 1h validity; adjust if DNSE docs specify
@@ -94,6 +99,15 @@ class TradingTokenManager:
                 )
             return self._token
 
+        if self._otp_provider:
+            try:
+                otp = self._otp_provider()
+            except Exception as e:
+                logger.error("OTP provider failed", extra={"error": str(e)})
+                otp = None
+            if otp:
+                return self.activate_token(otp)
+
         msg = (
             "DNSE trading token is missing. Auto OTP prompt is disabled in live mode. "
             "Run scripts/request_dnse_trading_token.py and set DNSE_TRADING_TOKEN "
@@ -106,7 +120,11 @@ class TradingTokenManager:
 class BeeTradeClient:
     """Main client wrapping DNSEClient with logging, error handling, and token management."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(
+        self,
+        settings: Optional[Settings] = None,
+        otp_provider: Optional[Callable[[], Optional[str]]] = None,
+    ):
         self.settings = settings or get_settings()
 
         self._sdk = DNSEClient(
@@ -115,7 +133,7 @@ class BeeTradeClient:
             base_url=self.settings.DNSE_BASE_URL,
         )
 
-        self.token_manager = TradingTokenManager(self._sdk)
+        self.token_manager = TradingTokenManager(self._sdk, otp_provider=otp_provider)
         self._order_limiter = SlidingWindowRateLimiter(
             limit=self.settings.MAX_ORDERS_PER_MINUTE,
             window=60.0,

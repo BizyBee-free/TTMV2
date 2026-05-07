@@ -526,6 +526,38 @@ def _v2_score_short(d: Dict[str, Any]) -> float:
         return 0.0
 
 
+def _v2_long_scoring_domain_row(d: Dict[str, Any]) -> bool:
+    """
+    Bars where TTM V2 LONG alpha is active: tradable continuation ``breakout_up``
+    (logged as ``breakout_up_filtered_last``).
+    """
+    f = d.get("features") or {}
+    if "breakout_up_filtered_last" in f:
+        return bool(f.get("breakout_up_filtered_last"))
+    if "effective_strength_active" in f:
+        try:
+            v = f.get("effective_strength_active")
+            if v is None:
+                return False
+            return bool(float(v) > 0.5)
+        except (TypeError, ValueError):
+            return False
+    # Older / synthetic logs without filtered flag: approximate continuation bar.
+    raw_up = bool(f.get("is_breakout_up")) or bool(f.get("breakout_up_raw_last"))
+    if not raw_up:
+        return False
+    if bool(f.get("exhaustion_candidate")):
+        return False
+    rs = _feature_float(d, "raw_strength")
+    return np.isfinite(rs) and float(rs) > 0.0
+
+
+def _v2_short_scoring_domain_row(d: Dict[str, Any]) -> bool:
+    """Bars in the exhaustion-confirmed SHORT domain (matches V2 short_signal)."""
+    f = d.get("features") or {}
+    return bool(f.get("exhaustion_confirm"))
+
+
 # --- statistical helpers -----------------------------------------------------
 
 
@@ -639,14 +671,13 @@ def test_breakout(
 ) -> BlockResult:
     """
     Raw up-breakout (``is_breakout_up`` / ``close > rolling_high``) vs non-breakout on
-    forward returns. ``breakout_strength`` buckets and monotonicity use **only** those
-    raw-breakout rows (not tradable-filtered ``breakout_up``).
+    forward returns. Strength buckets and monotonicity use **raw_strength** only
+    (breakout "force" axis), not ``effective_strength``.
 
     If no decision row includes raw-breakout keys, uses a **close-only** rolling proxy
     (see :func:`_is_breakout_up_close_proxy`) and logs a warning.
 
-    Strength buckets prefer ``features.effective_strength`` when finite; otherwise
-    ``breakout_strength``. Set ``require_strict_triplet=False`` (or config
+    Set ``require_strict_triplet=False`` (or config
     ``ttm_validation_breakout_require_strict_triplet``) only with PM sign-off.
     """
     triplet_req = (
@@ -664,9 +695,8 @@ def test_breakout(
     actual_traps = 0
     raw_up_total = 0
     valid_up_total = 0
-    up_rows: List[Tuple[float, float, float, float]] = []  # (strength_axis_value, ret_2, ret_3, ret_4)
+    up_rows: List[Tuple[float, float, float, float]] = []  # (raw_strength, ret_2, ret_3, ret_4)
     down_rows: List[Tuple[float, float]] = []  # (breakout_strength_down, ret_4_short)
-    strength_rows_used_eff = 0
 
     use_close_proxy = not any(_decision_has_raw_breakout_feature_keys(d) for d in decisions)
     if use_close_proxy:
@@ -685,18 +715,6 @@ def test_breakout(
         else:
             ex = _is_breakout_up_from_features(d)
             is_up = bool(ex) if ex is not None else False
-        eff_bs = _feature_float(d, "effective_strength")
-        if np.isfinite(eff_bs):
-            bs = float(eff_bs)
-        else:
-            try:
-                bs = (
-                    float(f["breakout_strength"])
-                    if f.get("breakout_strength") is not None
-                    else float("nan")
-                )
-            except (TypeError, ValueError):
-                bs = float("nan")
         exhaustion_candidate = bool(f.get("exhaustion_candidate"))
         fr = _forward_return(closes, bi, forward_h)
         r2 = _forward_return(closes, bi, 2)
@@ -724,11 +742,9 @@ def test_breakout(
             and tradable_extra
         )
 
-        # Strength buckets: only bars that pass valid_breakout filter.
-        if valid_breakout and (not exhaustion_candidate) and np.isfinite(bs):
-            if np.isfinite(eff_bs):
-                strength_rows_used_eff += 1
-            up_rows.append((float(bs), float(r2), float(r3), float(r4)))
+        # Strength buckets: valid continuation breakouts only; axis = raw_strength.
+        if valid_breakout and (not exhaustion_candidate) and np.isfinite(rs):
+            up_rows.append((float(rs), float(r2), float(r3), float(r4)))
         is_dn_ex = _is_breakout_down_from_features(d)
         is_dn = bool(is_dn_ex) if is_dn_ex is not None else False
         bsd = _feat(d, "breakout_strength_down", default=float("nan"))
@@ -783,10 +799,7 @@ def test_breakout(
         "monotonic_low_mid_high": None,
         "strength_validation_mode": None,
         "mean_ret_4_high_minus_low": None,
-        "strength_axis": (
-            "effective_strength" if strength_rows_used_eff > 0 else "breakout_strength_fallback"
-        ),
-        "n_bucket_rows_using_effective_strength": int(strength_rows_used_eff),
+        "strength_axis": "raw_strength",
         "mean_ret_low": None,
         "mean_ret_mid": None,
         "mean_ret_high": None,
@@ -1228,17 +1241,25 @@ def test_scoring(
     if dir_u == "short":
         uses_short_feature_score = any(np.isfinite(_feature_float(d, "short_score")) for d in decisions)
 
+    n_decisions = 0
+    n_in_domain = 0
     for d in decisions:
+        n_decisions += 1
         bi = int(d["bar_index"])
         if dir_u == "long":
+            if not _v2_long_scoring_domain_row(d):
+                continue
             sc = _v2_score_long(d)
         else:
+            if not _v2_short_scoring_domain_row(d):
+                continue
             if uses_short_feature_score:
                 sc = _feature_float(d, "short_score")
                 if not np.isfinite(sc):
                     continue
             else:
                 sc = _v2_score_short(d)
+        n_in_domain += 1
         fr = _forward_return(closes, bi, forward_h)
         if not np.isnan(fr):
             y = float(fr) if dir_u == "long" else float(-fr)
@@ -1305,8 +1326,17 @@ def test_scoring(
         passed = False
         er.append(f"scoring_{label}: Spearman negative ({rho:.4f})")
 
+    domain_name = "breakout_up_filtered_last" if dir_u == "long" else "exhaustion_confirm"
+    if len(sx) == 0 and n_in_domain > 0:
+        wr.append(
+            f"scoring_{label}: {n_in_domain} bar(s) in domain {domain_name!r} but no finite forward returns"
+        )
+
     metrics = {
         "direction": dir_u,
+        "scoring_domain": domain_name,
+        "n_decision_rows": int(n_decisions),
+        "n_rows_in_scoring_domain": int(n_in_domain),
         "score_source": "features.short_score" if (dir_u == "short" and uses_short_feature_score) else f"v2.score_{dir_u}",
         "aligned_target": "forward_return" if dir_u == "long" else "neg_forward_return",
         "n_samples": len(sx),

@@ -56,7 +56,7 @@ def test_v2_alpha_ignores_oi_for_score() -> None:
 
 
 def test_score_distribution_not_saturated_on_series() -> None:
-    """Many bars should not all hit ±cap (rank-normalized score)."""
+    """LONG score remains bounded and finite under diverse histories."""
     n = 150
     rng = np.random.default_rng(99)
     closes = 100.0 + rng.standard_normal(n).cumsum() * 0.15
@@ -72,10 +72,9 @@ def test_score_distribution_not_saturated_on_series() -> None:
         last = features_last_row(sub)
         sl, _, _ = compute_score_v2_alpha(sub, last, cfg)
         scores.append(sl)
-    cap = float(cfg.get("ttm_v2_alpha_score_cap", 5.0))
-    at_cap = sum(abs(abs(s) - cap) < 1e-6 for s in scores)
-    assert at_cap < len(scores) * 0.95
-    assert float(np.std(np.asarray(scores, dtype=np.float64))) > 1e-4
+    arr = np.asarray(scores, dtype=np.float64)
+    assert np.all(np.isfinite(arr))
+    assert np.all(np.abs(arr) <= 1.0 + 1e-9)
 
 
 def test_v2_short_score_uses_dedicated_exhaustion_leg() -> None:
@@ -126,7 +125,7 @@ def test_v2_alpha_component_keys() -> None:
 
 
 def test_v2_vol_breakout_interaction_optional() -> None:
-    """When ttm_v2_vol_breakout_interaction_k > 0, breakout leg is scaled by (1 + k*tanh(vol_z))."""
+    """LONG score is driven by effective_strength only; vol-breakout interaction no longer changes it."""
     n = 100
     closes = np.linspace(100.0, 101.0, n)
     vol = np.linspace(500.0, 50_000.0, n)
@@ -141,9 +140,10 @@ def test_v2_vol_breakout_interaction_optional() -> None:
     data = {"bars": _bars(closes, vol), "basis": basis.tolist(), "open_interest": oi}
     feats = compute_ttm_features_from_config(dict(data), cfg0)
     last = features_last_row(feats)
-    _, _, c0 = compute_score_v2_alpha(feats, last, cfg0)
+    sl0, _, c0 = compute_score_v2_alpha(feats, last, cfg0)
     feats1 = compute_ttm_features_from_config(dict(data), cfg1)
     last1 = features_last_row(feats1)
-    _, _, c1 = compute_score_v2_alpha(feats1, last1, cfg1)
+    sl1, _, c1 = compute_score_v2_alpha(feats1, last1, cfg1)
     assert c0["vol_breakout_interaction_factor"] == 1.0
-    assert c1["vol_breakout_interaction_factor"] > 1.0
+    assert c1["vol_breakout_interaction_factor"] == 1.0
+    assert abs(sl0 - sl1) < 1e-9

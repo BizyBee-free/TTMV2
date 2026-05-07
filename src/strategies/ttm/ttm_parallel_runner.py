@@ -254,6 +254,8 @@ def _features_snapshot(last: Mapping[str, Any]) -> Dict[str, Any]:
         "short_score": _snapshot_feature_value(last, "short_score"),
         "extension": _snapshot_feature_value(last, "extension"),
         "last_bar_return": _snapshot_feature_value(last, "last_bar_return"),
+        "effective_strength_pre_gate": _snapshot_feature_value(last, "effective_strength_pre_gate"),
+        "effective_strength_active": _json_safe(last.get("effective_strength_active")),
         "effective_strength": _snapshot_feature_value(last, "effective_strength"),
     }
 
@@ -1116,17 +1118,7 @@ class ParallelRunner:
                 qty = 1
                 if model == "v2":
                     feat = sig_v2.get("features") if isinstance(sig_v2.get("features"), dict) else {}
-                    strength_key = "short_score" if a == "SHORT" else "breakout_strength"
-                    brk = float(feat.get(strength_key, 0.0) or 0.0)
-                    strength_scale = max(1e-9, float(self.config.get("ttm_v2_strength_scale", 1.0)))
-                    size_mult = float(np.clip(brk / strength_scale, 0.5, 1.5))
-                    vol_z = float(feat.get("vol_zscore", feat.get("vol_z", 0.0)) or 0.0)
-                    k_vol = float(self.config.get("ttm_v2_position_size_vol_k", 0.25))
-                    vol_part = (
-                        1.0 + k_vol * float(np.tanh(vol_z)) if np.isfinite(vol_z) else 1.0
-                    )
-                    size_mult = float(size_mult * vol_part)
-                    qty = max(1, int(round(size_mult)))
+                    qty = 1
                 if model == "v2" and self.execution_realism is not None and bars:
                     sb = bars[bar_index]
                     cfg_e = self.execution_realism

@@ -196,6 +196,8 @@ def generate_ttm_signal_v2(
     feat_pack["short_setup_cap"] = _masked_last_optional(last, "short_setup_cap")
     feat_pack["extension"] = _masked_last_optional(last, "extension")
     feat_pack["last_bar_return"] = _masked_last_optional(last, "last_bar_return")
+    feat_pack["effective_strength_pre_gate"] = _masked_last_optional(last, "effective_strength_pre_gate")
+    feat_pack["effective_strength_active"] = bool(last.get("effective_strength_active"))
     feat_pack["effective_strength"] = _masked_last_optional(last, "effective_strength")
     if np.isfinite(vol_z):
         feat_pack["vol_zscore"] = float(vol_z)
@@ -298,6 +300,8 @@ def generate_ttm_signal_v2(
             "extension": feat_pack.get("extension"),
             "last_bar_return": feat_pack.get("last_bar_return"),
             "effective_strength": feat_pack.get("effective_strength"),
+            "effective_strength_pre_gate": feat_pack.get("effective_strength_pre_gate"),
+            "effective_strength_active": feat_pack.get("effective_strength_active"),
             "feature_valid_mask": dict(last.get("feature_valid_mask") or {}),
             "top_components": _top_component_names(components, 3),
             "oi_context_flag": last.get("oi_context_flag"),
@@ -445,6 +449,8 @@ def generate_ttm_signal_v2(
         "extension": feat_pack.get("extension"),
         "last_bar_return": feat_pack.get("last_bar_return"),
         "effective_strength": feat_pack.get("effective_strength"),
+        "effective_strength_pre_gate": feat_pack.get("effective_strength_pre_gate"),
+        "effective_strength_active": feat_pack.get("effective_strength_active"),
         "feature_valid_mask": dict(last.get("feature_valid_mask") or {}),
         "top_components": _top_component_names(components, 3),
         "model_version": "v2",
