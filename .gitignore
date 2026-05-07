@@ -32,6 +32,8 @@ env/
 logs/
 *.log
 *.jsonl
+# Live session dumps (often > GitHub 100MB limit)
+data/debug/ttm_live_*.txt
 
 # IDE
 .vscode/
