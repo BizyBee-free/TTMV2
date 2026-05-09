@@ -1093,11 +1093,11 @@ def compute_ttm_features(
     return result
 
 
-def features_last_row(features: Dict[str, Any]) -> Dict[str, Any]:
+def features_row_at(features: Dict[str, Any], i: int) -> Dict[str, Any]:
+    """Causal feature snapshot at bar index ``i`` (same schema as :func:`features_last_row`)."""
     n = int(features.get("n", 0))
-    if n <= 0:
+    if n <= 0 or i < 0 or i >= n:
         return {}
-    i = n - 1
     out: Dict[str, Any] = {}
     for key in (
         "rolling_high",
@@ -1289,6 +1289,13 @@ def features_last_row(features: Dict[str, Any]) -> Dict[str, Any]:
     out["oi_context_flag"] = str(features.get("oi_context_flag") or "NORMAL")
 
     return out
+
+
+def features_last_row(features: Dict[str, Any]) -> Dict[str, Any]:
+    n = int(features.get("n", 0))
+    if n <= 0:
+        return {}
+    return features_row_at(features, n - 1)
 
 
 def compute_ttm_features_from_config(raw: Dict[str, Any], config: Mapping[str, Any]) -> Dict[str, Any]:

@@ -8,6 +8,7 @@ from src.backtest.data_fetcher import OhlcBar
 from src.strategies.ttm.config import TTM_CONFIG
 from src.strategies.ttm.ttm_features import compute_ttm_features_from_config
 from src.strategies.ttm.ttm_score import compute_score_v2_alpha
+from src.strategies.ttm.ttm_v2_effective_strength import compute_effective_strength_v3
 
 
 def _bars_uptrend(n: int = 40) -> list[OhlcBar]:
@@ -121,6 +122,104 @@ def test_breakout_validation_buckets_use_raw_strength_axis() -> None:
     br = tv.test_breakout(decisions, closes, forward_h=2, min_samples=3)
     ev = (br.metrics or {}).get("breakout_up_eval") or {}
     assert ev.get("strength_axis") == "raw_strength"
+
+
+def test_effective_strength_v3_no_breakout_all_zero() -> None:
+    n = 25
+    close = np.linspace(100.0, 102.0, n)
+    bu = np.zeros(n, dtype=bool)
+    feats = {
+        "n": n,
+        "close": close,
+        "breakout_up": bu,
+        "failure_depth_up": np.zeros(n),
+    }
+    last = {"breakout_up": False, "raw_strength": 1.0, "momentum_1_z": 0.5}
+    out = compute_effective_strength_v3(feats, last, n - 1, {**TTM_CONFIG})
+    assert out["score_long"] == 0.0
+    assert out["crowd_phase"] == "no_breakout"
+    assert out["entry_block_reason"] == "no_breakout"
+
+
+def test_compute_score_v2_alpha_v3_branch_populates_components() -> None:
+    n = 40
+    close = np.linspace(100.0, 104.0, n)
+    bu = np.zeros(n, dtype=bool)
+    bu[-1] = True
+    brk = np.zeros(n)
+    brk[-1] = 1.2
+    feats = {
+        "n": n,
+        "close": close,
+        "breakout_up": bu,
+        "breakout_strength_base": brk,
+        "short_score": np.full(n, np.nan),
+        "exhaustion_confirm": np.zeros(n, dtype=bool),
+        "momentum_1_z": np.zeros(n),
+        "basis_signal": np.zeros(n),
+        "raw_strength": brk,
+        "price_z": np.zeros(n),
+        "extension": np.zeros(n),
+        "last_bar_return": np.zeros(n),
+        "effective_strength": np.zeros(n),
+        "failure_depth_up": np.zeros(n),
+    }
+    from src.strategies.ttm.ttm_features import features_last_row
+
+    last = features_last_row(feats)
+    cfg = {**TTM_CONFIG, "ttm_v2_use_effective_strength_v3": True}
+    sl, ss, comp = compute_score_v2_alpha(feats, last, cfg)
+    assert np.isfinite(sl) and np.isfinite(ss)
+    assert "crowd_phase" in comp
+    assert comp["crowd_phase"] in (
+        "ignition",
+        "early_continuation",
+        "late_fomo",
+        "exhaustion",
+        "failed_breakout",
+        "no_breakout",
+    )
+    assert "breakout_conviction" in comp
+    assert float(comp["breakout_conviction"]) >= 0.0
+
+
+def test_v3_penalizes_positive_last_bar_return_vs_flat() -> None:
+    n = 35
+    close = np.linspace(100.0, 103.5, n)
+    bu = np.zeros(n, dtype=bool)
+    bu[-1] = True
+    lb_flat = np.zeros(n)
+    lb_spike = np.zeros(n)
+    lb_spike[-1] = 0.08
+    brk = np.zeros(n)
+    brk[-1] = 1.0
+    fd = np.zeros(n)
+    feats_base = {
+        "n": n,
+        "close": close,
+        "breakout_up": bu,
+        "breakout_strength_base": brk,
+        "short_score": np.full(n, np.nan),
+        "exhaustion_confirm": np.zeros(n, dtype=bool),
+        "momentum_1_z": np.full(n, 0.2),
+        "basis_signal": np.zeros(n),
+        "raw_strength": brk,
+        "price_z": np.full(n, 0.1),
+        "extension": np.full(n, 0.5),
+        "effective_strength": np.zeros(n),
+        "failure_depth_up": fd,
+    }
+    from src.strategies.ttm.ttm_features import features_last_row
+
+    f1 = {**feats_base, "last_bar_return": lb_flat}
+    f2 = {**feats_base, "last_bar_return": lb_spike}
+    cfg = {**TTM_CONFIG, "ttm_v2_use_effective_strength_v3": True}
+    l1 = features_last_row(f1)
+    l2 = features_last_row(f2)
+    v1 = compute_effective_strength_v3(f1, l1, n - 1, cfg)
+    v2 = compute_effective_strength_v3(f2, l2, n - 1, cfg)
+    assert v2["positive_last_bar_return"] >= v1["positive_last_bar_return"]
+    assert v2["score_long"] < v1["score_long"]
 
 
 def test_score_long_zero_outside_breakout_up_despite_effective_strength() -> None:

@@ -5,7 +5,7 @@ Unified TTM scoring: bounded blocks, symmetric long/short, softmax probs.
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple, cast
 
 import numpy as np
 
@@ -102,7 +102,7 @@ def compute_score_v2_alpha(
     config: Mapping[str, Any],
     *,
     bar_index: Optional[int] = None,
-) -> Tuple[float, float, Dict[str, float]]:
+) -> Tuple[float, float, Dict[str, Any]]:
     """
     TTM V2 unified symmetric alpha (no standalone vol_z term; vol gate / sizing in signal layer).
 
@@ -113,6 +113,10 @@ def compute_score_v2_alpha(
     - ``alpha_rank`` = percentile rank of current ``alpha_raw`` in trailing window.
     - ``score`` = clip((2*alpha_rank - 1) * cap, -cap, cap); logits for probs are ``(score, -score)``
       via existing :func:`scores_to_probs`.
+
+    When ``ttm_v2_use_effective_strength_v3`` is True, the LONG leg uses
+    :func:`~src.strategies.ttm.ttm_v2_effective_strength.compute_effective_strength_v3`
+    (tanh of weighted conviction / continuation minus extension / FOMO penalties); SHORT path unchanged.
     """
     if bool(config.get("ttm_strict_feature_finite", False)):
         for name in (
@@ -169,11 +173,35 @@ def compute_score_v2_alpha(
     last_bar_return = _v2_feat_slice(feats, "last_bar_return", n)
     if eff_slice is None:
         eff_slice = np.where(bu, brk, 0.0)
-    eff_last = float(eff_slice[bi]) if np.isfinite(eff_slice[bi]) else 0.0
-    bu_last = bool(bu[bi])
-    score_long = float(np.tanh(eff_last)) if bu_last else 0.0
-    alpha_raw_long = eff_last if bu_last else 0.0
-    alpha_rank_long = _percentile_rank_in_window(eff_slice[max(0, n - rank_win) : bi + 1], eff_last)
+    use_v3 = bool(config.get("ttm_v2_use_effective_strength_v3", False))
+    v3_now: Optional[Dict[str, Any]] = None
+    if use_v3:
+        from src.strategies.ttm.ttm_features import features_row_at
+        from src.strategies.ttm.ttm_v2_effective_strength import compute_effective_strength_v3
+
+        v3_now = compute_effective_strength_v3(feats, last, bi, config)
+        valid_long = bool(last.get("breakout_up_filtered_last", last.get("breakout_up")))
+        score_long = float(v3_now["score_long"]) if valid_long else 0.0
+        eff_last = float(v3_now["effective_strength"])
+        alpha_raw_long = float(v3_now["effective_strength_raw"])
+        lo_r = max(0, bi - rank_win + 1)
+        raw_win_list = []
+        for j in range(lo_r, bi + 1):
+            row_j = features_row_at(cast(Dict[str, Any], feats), j)
+            v3j = compute_effective_strength_v3(feats, row_j, j, config)
+            raw_win_list.append(float(v3j["effective_strength_raw"]))
+        alpha_rank_long = _percentile_rank_in_window(
+            np.asarray(raw_win_list, dtype=np.float64), alpha_raw_long
+        )
+        bu_last = valid_long
+    else:
+        eff_last = float(eff_slice[bi]) if np.isfinite(eff_slice[bi]) else 0.0
+        bu_last = bool(bu[bi])
+        score_long = float(np.tanh(eff_last)) if bu_last else 0.0
+        alpha_raw_long = eff_last if bu_last else 0.0
+        alpha_rank_long = _percentile_rank_in_window(
+            eff_slice[max(0, n - rank_win) : bi + 1], eff_last
+        )
 
     # SHORT path remains the dedicated exhaustion leg.
     short_breakout = _v2_feat_slice(feats, "short_score", n)
@@ -208,10 +236,78 @@ def compute_score_v2_alpha(
     else:
         score_short = float(np.clip(np.tanh(alpha_raw_short) * cap, -cap, cap))
 
+    use_short_v3 = bool(config.get("ttm_v2_use_short_effective_strength_v3", False))
+    short_state: Optional[Dict[str, Any]] = None
+    if use_short_v3:
+        from src.strategies.ttm.ttm_features import features_row_at
+        from src.strategies.ttm.ttm_v2_phases import classify_crowd_phase
+        from src.strategies.ttm.ttm_v2_short_opportunity import compute_short_opportunity_v3
+
+        if v3_now is not None:
+            long_comp: Dict[str, Any] = {
+                "crowd_phase": str(v3_now["crowd_phase"]),
+                "continuation_confirm": float(v3_now["continuation_confirm"]),
+                "score_long": float(score_long),
+                "positive_last_bar_return": float(v3_now["positive_last_bar_return"]),
+                "late_phase_penalty": float(v3_now["late_phase_penalty"]),
+                "extension": float(v3_now["extension"]),
+            }
+        else:
+            mom_ = float(last.get("momentum_1_z") or 0.0)
+            lb_ = float(last.get("last_bar_return") or 0.0)
+            long_comp = {
+                "crowd_phase": str(classify_crowd_phase(last, config)),
+                "continuation_confirm": float(np.tanh(mom_ / 2.0)),
+                "score_long": float(score_long),
+                "positive_last_bar_return": float(max(0.0, np.tanh(lb_ * 6.0))),
+                "late_phase_penalty": 0.0,
+                "extension": abs(float(last.get("extension") or last.get("price_z") or 0.0)),
+            }
+        short_state = compute_short_opportunity_v3(feats, last, bi, config, long_comp)
+        alpha_raw_short = float(short_state["short_effective_strength_raw"])
+        lo_sr = max(0, bi - rank_win + 1)
+        sr_list: list[float] = []
+        for j in range(lo_sr, bi + 1):
+            row_j = features_row_at(cast(Dict[str, Any], feats), j)
+            if v3_now is not None:
+                from src.strategies.ttm.ttm_v2_effective_strength import compute_effective_strength_v3
+
+                v3j = compute_effective_strength_v3(feats, row_j, j, config)
+                valid_j = bool(row_j.get("breakout_up_filtered_last", row_j.get("breakout_up")))
+                sl_j = float(v3j["score_long"]) if valid_j else 0.0
+                lcj: Dict[str, Any] = {
+                    "crowd_phase": str(v3j["crowd_phase"]),
+                    "continuation_confirm": float(v3j["continuation_confirm"]),
+                    "score_long": sl_j,
+                    "positive_last_bar_return": float(v3j["positive_last_bar_return"]),
+                    "late_phase_penalty": float(v3j["late_phase_penalty"]),
+                    "extension": float(v3j["extension"]),
+                }
+            else:
+                mom_j = float(row_j.get("momentum_1_z") or 0.0)
+                lb_j = float(row_j.get("last_bar_return") or 0.0)
+                lcj = {
+                    "crowd_phase": str(classify_crowd_phase(row_j, config)),
+                    "continuation_confirm": float(np.tanh(mom_j / 2.0)),
+                    "score_long": float(np.tanh(float(row_j.get("effective_strength") or 0.0)))
+                    if bool(row_j.get("breakout_up"))
+                    else 0.0,
+                    "positive_last_bar_return": float(max(0.0, np.tanh(lb_j * 6.0))),
+                    "late_phase_penalty": 0.0,
+                    "extension": abs(float(row_j.get("extension") or row_j.get("price_z") or 0.0)),
+                }
+            stj = compute_short_opportunity_v3(feats, row_j, j, config, lcj)
+            sr_list.append(float(stj["short_effective_strength_raw"]))
+        alpha_rank_short = _percentile_rank_in_window(np.asarray(sr_list, dtype=np.float64), alpha_raw_short)
+        if use_rank_score:
+            score_short = float(np.clip((2.0 * alpha_rank_short - 1.0) * cap, -cap, cap))
+        else:
+            score_short = float(np.clip(np.tanh(alpha_raw_short) * cap, -cap, cap))
+
     c1_long = c2_long = c3_long = 0.0
     s1_long = s2_long = s3_long = 1.0
     v_int_last = 1.0
-    components: Dict[str, float] = {
+    components: Dict[str, Any] = {
         "alpha_raw": alpha_raw_long,
         "alpha_rank": float(alpha_rank_long),
         "alpha_raw_long": alpha_raw_long,
@@ -245,7 +341,7 @@ def compute_score_v2_alpha(
         "w_basis": w3,
         "breakout_signed_last": float(eff_last - short_breakout[bi]),
         "breakout_long_last": float(eff_last),
-        "effective_strength_last": float(eff_slice[bi]) if eff_slice is not None else float(brk[bi]),
+        "effective_strength_last": float(eff_last),
         "raw_strength_last": float(raw_strength[bi]),
         "price_z_last": float(price_z[bi]),
         "last_bar_return_last": float(last_bar_return[bi]),
@@ -257,6 +353,31 @@ def compute_score_v2_alpha(
         # Legacy key for follow_design / diagnostics: sign carries side preference.
         "momentum": score_long - score_short,
     }
+    if v3_now is not None:
+        components["crowd_phase"] = str(v3_now["crowd_phase"])
+        components["late_fomo_flag"] = bool(v3_now["late_fomo_flag"])
+        er = v3_now.get("entry_block_reason")
+        components["entry_block_reason"] = er
+        for _k in (
+            "breakout_conviction",
+            "continuation_confirm",
+            "basis_confirm",
+            "extension",
+            "extension_sq",
+            "last_bar_return_raw",
+            "last_bar_return_norm",
+            "positive_last_bar_return",
+            "late_phase_penalty",
+        ):
+            components[_k] = float(v3_now[_k])
+        components["effective_strength_v3_raw"] = float(v3_now["effective_strength_raw"])
+    if short_state is not None:
+        for _sk, _sv in short_state.items():
+            if str(_sk).startswith("_") or _sk == "short_score":
+                continue
+            components[str(_sk)] = _sv
+        components["alpha_raw_short"] = float(short_state["short_effective_strength_raw"])
+        components["short_score_unit"] = float(short_state["short_score"])
     if bool(config.get("ttm_strict_asserts", False)):
         if not (np.isfinite(score_long) and np.isfinite(score_short)):
             raise ValueError("non-finite score from compute_score_v2_alpha")

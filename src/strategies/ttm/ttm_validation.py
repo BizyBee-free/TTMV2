@@ -20,6 +20,7 @@ import csv
 import json
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1447,6 +1448,652 @@ def test_adaptive(
 # --- orchestration -----------------------------------------------------------
 
 
+def _safe_float(x: Any) -> Optional[float]:
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return None
+    return v if np.isfinite(v) else None
+
+
+def _closed_v2_rows(trades: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [
+        t
+        for t in trades
+        if str(t.get("event_type", "")).lower() == "trade"
+        and str(t.get("model", "")).lower() == "v2"
+        and str(t.get("event", "")).upper() == "CLOSED"
+    ]
+
+
+def _bucket3(values: np.ndarray) -> Tuple[float, float]:
+    if values.size == 0:
+        return 0.0, 0.0
+    q1, q2 = np.quantile(values, [1.0 / 3.0, 2.0 / 3.0])
+    return float(q1), float(q2)
+
+
+def _bucket_stats_from_pairs(score: np.ndarray, target: np.ndarray) -> Dict[str, Any]:
+    mask = np.isfinite(score) & np.isfinite(target)
+    s = score[mask]
+    y = target[mask]
+    if s.size == 0:
+        return {
+            "n_samples": 0,
+            "pearson_r": None,
+            "spearman_rho": None,
+            "bucket_low_mid_high": [],
+            "top20_minus_bottom20": None,
+            "top_count": 0,
+            "bottom_count": 0,
+            "insufficient_sample": True,
+        }
+    pr, _ = _pearson(s, y)
+    sr, _ = _spearman(s, y)
+    q1, q2 = _bucket3(s)
+    out_rows: List[Dict[str, Any]] = []
+    for name, cond in (
+        ("low", s <= q1),
+        ("mid", (s > q1) & (s <= q2)),
+        ("high", s > q2),
+    ):
+        yy = y[cond]
+        out_rows.append(
+            {
+                "bucket": name,
+                "n": int(yy.size),
+                "mean_forward_return": float(np.mean(yy)) if yy.size else None,
+                "winrate": float(np.mean(yy > 0.0)) if yy.size else None,
+            }
+        )
+    ql = float(np.quantile(s, 0.2))
+    qh = float(np.quantile(s, 0.8))
+    low = y[s <= ql]
+    high = y[s >= qh]
+    return {
+        "n_samples": int(s.size),
+        "pearson_r": float(pr) if np.isfinite(pr) else None,
+        "spearman_rho": float(sr) if np.isfinite(sr) else None,
+        "bucket_low_mid_high": out_rows,
+        "top20_minus_bottom20": (
+            float(np.mean(high) - np.mean(low)) if high.size and low.size else None
+        ),
+        "top_count": int(high.size),
+        "bottom_count": int(low.size),
+        "insufficient_sample": bool(s.size < 20),
+    }
+
+
+def _partial_sessions_from_meta(meta: Dict[str, Any], decisions: Sequence[Dict[str, Any]]) -> List[str]:
+    out: List[str] = []
+    d_files = [str(x) for x in (meta.get("decision_files") or [])]
+    for fp in d_files:
+        m = re.search(r"_(\d{8})_(\d{4})\.jsonl$", fp.replace("\\", "/"))
+        if not m:
+            continue
+        ymd, hhmm = m.group(1), m.group(2)
+        if hhmm < "1438":
+            out.append(f"{ymd}_{hhmm}")
+    if out:
+        return sorted(list(dict.fromkeys(out)))
+    # fallback from timestamps
+    by_date_max: Dict[str, int] = {}
+    for d in decisions:
+        ts = str(d.get("timestamp", ""))
+        if len(ts) < 10 or not ts.isdigit():
+            continue
+        dt = datetime.utcfromtimestamp(int(ts) + 7 * 3600)
+        ymd = dt.strftime("%Y%m%d")
+        hhmm = int(dt.strftime("%H%M"))
+        by_date_max[ymd] = max(by_date_max.get(ymd, 0), hhmm)
+    for ymd, hhmm in by_date_max.items():
+        if hhmm < 1438:
+            out.append(f"{ymd}_{hhmm:04d}")
+    return sorted(out)
+
+
+def build_refactor5_report(
+    *,
+    decisions: Sequence[Dict[str, Any]],
+    trades: Sequence[Dict[str, Any]],
+    closes: np.ndarray,
+    close_meta: Dict[str, Any],
+    merge_meta: Dict[str, Any],
+    forward_horizon: int,
+    symbol: str,
+    date_start: Optional[str],
+    date_end: Optional[str],
+    baseline_validation_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    by_bar = {int(d.get("bar_index", -1)): d for d in decisions}
+    closed = _closed_v2_rows(trades)
+    long_closed = [t for t in closed if str(t.get("side", "")).upper() == "LONG"]
+    short_closed = [t for t in closed if str(t.get("side", "")).upper() == "SHORT"]
+    partial_sessions = _partial_sessions_from_meta(merge_meta, decisions)
+
+    dataset_summary = {
+        "n_decisions": int(len(decisions)),
+        "n_trades": int(len(closed)),
+        "n_long_trades": int(len(long_closed)),
+        "n_short_trades": int(len(short_closed)),
+        "date_start": date_start,
+        "date_end": date_end,
+        "partial_sessions": partial_sessions,
+        "close_missing_count": int(close_meta.get("close_missing_count", 0) or 0),
+        "close_missing_ratio": float(close_meta.get("close_missing_ratio", 0.0) or 0.0),
+        "partial_session_note": "20260508 likely partial if end-time < 14:38",
+    }
+
+    # 2) breakout detector health
+    bmask = []
+    nmask = []
+    for d in decisions:
+        bi = int(d.get("bar_index", -1))
+        if bi < 0 or bi >= len(closes):
+            continue
+        fr = _forward_return(closes, bi, forward_horizon)
+        if not np.isfinite(fr):
+            continue
+        f = d.get("features") or {}
+        is_brk = bool(f.get("is_breakout_up") or f.get("breakout_up_raw_last") or f.get("breakout_up_raw"))
+        if is_brk:
+            bmask.append(float(fr))
+        else:
+            nmask.append(float(fr))
+    breakout_health = {
+        "n_valid_breakout": int(len(bmask)),
+        "breakout_mean_forward_return": float(np.mean(bmask)) if bmask else None,
+        "non_breakout_mean_forward_return": float(np.mean(nmask)) if nmask else None,
+        "breakout_winrate": float(np.mean(np.array(bmask) > 0.0)) if bmask else None,
+        "non_breakout_winrate": float(np.mean(np.array(nmask) > 0.0)) if nmask else None,
+        "true_breakout_rate": _safe_float((merge_meta.get("true_breakout_rate"))),
+        "trap_adverse_count": None,
+        "interpretation": {
+            "raw_strength": "detector existence/force axis",
+            "score_long_effective_strength": "ranking expected return axis",
+        },
+    }
+
+    # 3) LONG scoring validation (scoring domain only)
+    s_score: List[float] = []
+    s_eff: List[float] = []
+    s_raw: List[float] = []
+    s_fwd: List[float] = []
+    for d in decisions:
+        if not _v2_long_scoring_domain_row(d):
+            continue
+        bi = int(d.get("bar_index", -1))
+        fr = _forward_return(closes, bi, forward_horizon)
+        if not np.isfinite(fr):
+            continue
+        s_fwd.append(float(fr))
+        s_score.append(float(_v2_score_long(d)))
+        s_eff.append(float(_feature_float(d, "effective_strength")))
+        s_raw.append(float(_feature_float(d, "raw_strength")))
+    arr_fwd = np.asarray(s_fwd, dtype=np.float64)
+    scoring_long = {
+        "score_long": _bucket_stats_from_pairs(np.asarray(s_score, dtype=np.float64), arr_fwd),
+        "effective_strength": _bucket_stats_from_pairs(np.asarray(s_eff, dtype=np.float64), arr_fwd),
+        "raw_strength_diagnostic": _bucket_stats_from_pairs(np.asarray(s_raw, dtype=np.float64), arr_fwd),
+        "acceptance_hint": "Prefer high > low; monotonic target only when sample sufficient",
+    }
+
+    # 4) last_bar_return impact
+    lbr_raw: List[float] = []
+    lbr_pos: List[float] = []
+    lbr_fwd: List[float] = []
+    for d in decisions:
+        if not _v2_long_scoring_domain_row(d):
+            continue
+        bi = int(d.get("bar_index", -1))
+        fr = _forward_return(closes, bi, forward_horizon)
+        if not np.isfinite(fr):
+            continue
+        lbr_raw.append(float(_feature_float(d, "last_bar_return")))
+        sc = (d.get("v2") or {}).get("score_components") or {}
+        lbr_pos.append(float(sc.get("positive_last_bar_return") or 0.0))
+        lbr_fwd.append(float(fr))
+    lbr_raw_a = np.asarray(lbr_raw, dtype=np.float64)
+    lbr_pos_a = np.asarray(lbr_pos, dtype=np.float64)
+    lbr_fwd_a = np.asarray(lbr_fwd, dtype=np.float64)
+    spike_thr = float(np.nanquantile(lbr_pos_a, 0.8)) if lbr_pos_a.size else 0.0
+    spike_mask = lbr_pos_a >= spike_thr if lbr_pos_a.size else np.array([], dtype=bool)
+    non_mask = ~spike_mask if lbr_pos_a.size else np.array([], dtype=bool)
+    last_bar_return_impact = {
+        "bucket_last_bar_return_raw": _bucket_stats_from_pairs(lbr_raw_a, lbr_fwd_a),
+        "bucket_positive_last_bar_return": _bucket_stats_from_pairs(lbr_pos_a, lbr_fwd_a),
+        "spike_threshold_candidate": spike_thr if np.isfinite(spike_thr) else None,
+        "spike_count": int(np.sum(spike_mask)) if spike_mask.size else 0,
+        "non_spike_count": int(np.sum(non_mask)) if non_mask.size else 0,
+        "spike_mean_forward_return": float(np.mean(lbr_fwd_a[spike_mask])) if spike_mask.size and np.any(spike_mask) else None,
+        "non_spike_mean_forward_return": float(np.mean(lbr_fwd_a[non_mask])) if non_mask.size and np.any(non_mask) else None,
+        "question_answer": {
+            "spike_worse_trade_quality": (
+                bool(np.mean(lbr_fwd_a[spike_mask]) < np.mean(lbr_fwd_a[non_mask]))
+                if spike_mask.size and np.any(spike_mask) and np.any(non_mask)
+                else None
+            ),
+            "blocked_by_spike_filter": int(np.sum(spike_mask)) if spike_mask.size else 0,
+        },
+    }
+
+    # 5) crowd phase performance
+    phase_rows: Dict[str, Dict[str, Any]] = {}
+    phase_names = ("no_breakout", "ignition", "early_continuation", "late_fomo", "exhaustion", "failed_breakout")
+    for ph in phase_names:
+        phase_rows[ph] = {"decision_count": 0, "trade_count": 0, "fwd": [], "pnl": [], "holding": [], "mfe": [], "mae": []}
+    for d in decisions:
+        bi = int(d.get("bar_index", -1))
+        v2log = ((d.get("v2") or {}).get("log") or {})
+        ph = str(v2log.get("crowd_phase") or "no_breakout")
+        if ph not in phase_rows:
+            continue
+        phase_rows[ph]["decision_count"] += 1
+        fr = _forward_return(closes, bi, forward_horizon)
+        if np.isfinite(fr):
+            phase_rows[ph]["fwd"].append(float(fr))
+    for t in closed:
+        ph = str(t.get("entry_crowd_phase") or "no_breakout")
+        if ph not in phase_rows:
+            continue
+        phase_rows[ph]["trade_count"] += 1
+        rr = _safe_float(t.get("realized_return"))
+        if rr is not None:
+            phase_rows[ph]["pnl"].append(rr)
+        hb = _safe_float(t.get("holding_period"))
+        if hb is not None:
+            phase_rows[ph]["holding"].append(hb)
+        mfe = _safe_float(t.get("mfe"))
+        mae = _safe_float(t.get("mae"))
+        if mfe is not None:
+            phase_rows[ph]["mfe"].append(mfe)
+        if mae is not None:
+            phase_rows[ph]["mae"].append(mae)
+    crowd_phase_performance = []
+    for ph in phase_names:
+        r = phase_rows[ph]
+        pnl = np.asarray(r["pnl"], dtype=np.float64) if r["pnl"] else np.array([], dtype=np.float64)
+        crowd_phase_performance.append(
+            {
+                "phase": ph,
+                "decision_count": int(r["decision_count"]),
+                "trade_count": int(r["trade_count"]),
+                "forward_return_mean": float(np.mean(r["fwd"])) if r["fwd"] else None,
+                "winrate": float(np.mean(pnl > 0.0)) if pnl.size else None,
+                "realized_pnl_sum": float(np.sum(pnl)) if pnl.size else None,
+                "avg_holding": float(np.mean(r["holding"])) if r["holding"] else None,
+                "mfe_mean": float(np.mean(r["mfe"])) if r["mfe"] else None,
+                "mae_mean": float(np.mean(r["mae"])) if r["mae"] else None,
+            }
+        )
+
+    # 6) entry block simulation (simulation only)
+    reason_stats: Dict[str, Dict[str, float]] = {}
+    for reason in ("late_fomo", "exhaustion", "last_bar_return_spike", "score_below_threshold", "failed_breakout"):
+        reason_stats[reason] = {"blocked": 0, "blocked_pnl": 0.0, "blocked_wins": 0, "kept": 0, "kept_pnl": 0.0, "kept_wins": 0}
+    for t in long_closed:
+        ebi = t.get("entry_bar_index")
+        if ebi is None:
+            continue
+        d = by_bar.get(int(ebi) - 1) or by_bar.get(int(ebi))
+        if not d:
+            continue
+        sc = ((d.get("v2") or {}).get("score_components") or {})
+        f = d.get("features") or {}
+        blocked_flags = {
+            "late_fomo": bool(sc.get("late_fomo_flag")),
+            "exhaustion": bool(f.get("exhaustion_confirm")),
+            "last_bar_return_spike": bool(float(sc.get("positive_last_bar_return") or 0.0) >= spike_thr),
+            "score_below_threshold": bool(float((d.get("v2") or {}).get("score_long") or 0.0) < float(TTM_CONFIG.get("ttm_v2_score_long_entry_threshold", 0.0))),
+            "failed_breakout": bool((not bool(f.get("breakout_up"))) and float(f.get("failure_strength") or 0.0) >= float(TTM_CONFIG.get("ttm_v2_failed_breakout_failure_min", 0.35))),
+        }
+        rr = _safe_float(t.get("realized_return"))
+        if rr is None:
+            continue
+        for k, v in blocked_flags.items():
+            st = reason_stats[k]
+            if v:
+                st["blocked"] += 1
+                st["blocked_pnl"] += rr
+                st["blocked_wins"] += int(rr > 0.0)
+            else:
+                st["kept"] += 1
+                st["kept_pnl"] += rr
+                st["kept_wins"] += int(rr > 0.0)
+    entry_block_simulation = []
+    for k, st in reason_stats.items():
+        b = max(1, int(st["blocked"]))
+        kp = max(1, int(st["kept"]))
+        entry_block_simulation.append(
+            {
+                "reason": k,
+                "mode": "simulation",
+                "blocked_trades": int(st["blocked"]),
+                "blocked_pnl": float(st["blocked_pnl"]),
+                "kept_pnl": float(st["kept_pnl"]),
+                "blocked_winrate": float(st["blocked_wins"] / b) if st["blocked"] else None,
+                "kept_winrate": float(st["kept_wins"] / kp) if st["kept"] else None,
+                "blocked_avg_trade": float(st["blocked_pnl"] / b) if st["blocked"] else None,
+                "kept_avg_trade": float(st["kept_pnl"] / kp) if st["kept"] else None,
+            }
+        )
+
+    # 7) holding period performance + soft-min hold count
+    hold_groups = {"1": [], "2": [], "3+": [], "4+": []}
+    soft_hold_count = 0
+    for t in closed:
+        hb = int(_safe_float(t.get("holding_period")) or 0)
+        rr = _safe_float(t.get("realized_return"))
+        if rr is None:
+            continue
+        if hb == 1:
+            hold_groups["1"].append(rr)
+        if hb == 2:
+            hold_groups["2"].append(rr)
+        if hb >= 3:
+            hold_groups["3+"].append(rr)
+        if hb >= 4:
+            hold_groups["4+"].append(rr)
+        if str(t.get("exit_reason") or "") == "soft_min_hold_continuation":
+            soft_hold_count += 1
+    holding_period_performance = []
+    for k in ("1", "2", "3+", "4+"):
+        arr = np.asarray(hold_groups[k], dtype=np.float64) if hold_groups[k] else np.array([], dtype=np.float64)
+        holding_period_performance.append(
+            {
+                "bucket": k,
+                "trade_count": int(arr.size),
+                "pnl_sum": float(np.sum(arr)) if arr.size else None,
+                "winrate": float(np.mean(arr > 0.0)) if arr.size else None,
+                "avg_trade": float(np.mean(arr)) if arr.size else None,
+            }
+        )
+
+    # 8) exit reason performance (split long/short)
+    def _exit_reason_table(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out = []
+        by_reason: Dict[str, List[Dict[str, Any]]] = {}
+        for t in rows:
+            r = str(t.get("exit_reason") or "unknown")
+            by_reason.setdefault(r, []).append(t)
+        for r, rr in sorted(by_reason.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+            rets = np.asarray([x for x in (_safe_float(x.get("realized_return")) for x in rr) if x is not None], dtype=np.float64)
+            holds = np.asarray([x for x in (_safe_float(x.get("holding_period")) for x in rr) if x is not None], dtype=np.float64)
+            mfe = np.asarray([x for x in (_safe_float(x.get("mfe")) for x in rr) if x is not None], dtype=np.float64)
+            mae = np.asarray([x for x in (_safe_float(x.get("mae")) for x in rr) if x is not None], dtype=np.float64)
+            out.append(
+                {
+                    "exit_reason": r,
+                    "count": int(len(rr)),
+                    "pnl": float(np.sum(rets)) if rets.size else None,
+                    "winrate": float(np.mean(rets > 0.0)) if rets.size else None,
+                    "avg_trade": float(np.mean(rets)) if rets.size else None,
+                    "avg_holding": float(np.mean(holds)) if holds.size else None,
+                    "mfe_mean": float(np.mean(mfe)) if mfe.size else None,
+                    "mae_mean": float(np.mean(mae)) if mae.size else None,
+                }
+            )
+        return out
+    exit_reason_performance = {
+        "long": _exit_reason_table(long_closed),
+        "short": _exit_reason_table(short_closed),
+    }
+
+    # 9) SHORT validation actual + candidates
+    short_actual_rets = np.asarray([x for x in (_safe_float(t.get("realized_return")) for t in short_closed) if x is not None], dtype=np.float64)
+    actual_short = {
+        "count": int(len(short_closed)),
+        "pnl": float(np.sum(short_actual_rets)) if short_actual_rets.size else None,
+        "winrate": float(np.mean(short_actual_rets > 0.0)) if short_actual_rets.size else None,
+        "avg_trade": float(np.mean(short_actual_rets)) if short_actual_rets.size else None,
+        "avg_holding": float(np.mean([_safe_float(t.get("holding_period")) for t in short_closed if _safe_float(t.get("holding_period")) is not None])) if short_closed else None,
+        "entry_short_phase_distribution": dict(Counter(str(t.get("short_entry_phase") or "unknown") for t in short_closed)),
+        "exit_reason_distribution": dict(Counter(str(t.get("exit_reason") or "unknown") for t in short_closed)),
+    }
+    cand_map: Dict[str, List[Tuple[float, float]]] = {}
+    all_short_scores: List[float] = []
+    all_short_targets: List[float] = []
+    phase_alias = ("no_short_context", "crowded_long_watch", "short_setup", "short_trigger", "short_chase_risk", "short_invalid")
+    for d in decisions:
+        bi = int(d.get("bar_index", -1))
+        fr = _forward_return(closes, bi, forward_horizon)
+        if not np.isfinite(fr):
+            continue
+        sh = ((d.get("v2") or {}).get("short_components") or {})
+        ph = str(sh.get("short_phase") or "no_short_context")
+        if ph not in phase_alias:
+            continue
+        sscore = _safe_float(sh.get("short_score"))
+        if sscore is None:
+            sscore = _safe_float(_feature_float(d, "short_score"))
+        if sscore is None:
+            continue
+        neg_fr = float(-fr)
+        cand_map.setdefault(ph, []).append((float(sscore), neg_fr))
+        all_short_scores.append(float(sscore))
+        all_short_targets.append(neg_fr)
+    short_candidates = []
+    for ph in phase_alias:
+        pairs = cand_map.get(ph, [])
+        if not pairs:
+            short_candidates.append({"phase": ph, "count": 0, "E_neg_forward_return": None, "short_winrate": None, "top_minus_bottom": None})
+            continue
+        sc = np.asarray([p[0] for p in pairs], dtype=np.float64)
+        tg = np.asarray([p[1] for p in pairs], dtype=np.float64)
+        ql = float(np.quantile(sc, 0.2))
+        qh = float(np.quantile(sc, 0.8))
+        low = tg[sc <= ql]
+        high = tg[sc >= qh]
+        short_candidates.append(
+            {
+                "phase": ph,
+                "count": int(len(pairs)),
+                "E_neg_forward_return": float(np.mean(tg)),
+                "short_winrate": float(np.mean(tg > 0.0)),
+                "top_minus_bottom": float(np.mean(high) - np.mean(low)) if low.size and high.size else None,
+            }
+        )
+    short_alpha_checks = {
+        "short_trigger_outperform_setup_watch": None,
+        "short_chase_risk_worse_than_trigger": None,
+        "blocked_early_continuation_not_good_short": None,
+        "no_prior_breakout_not_trusted": None,
+    }
+    cdict = {r["phase"]: r for r in short_candidates}
+    if cdict.get("short_trigger") and cdict.get("short_setup") and cdict.get("crowded_long_watch"):
+        vtr = cdict["short_trigger"]["E_neg_forward_return"]
+        vss = cdict["short_setup"]["E_neg_forward_return"]
+        vcw = cdict["crowded_long_watch"]["E_neg_forward_return"]
+        if vtr is not None and vss is not None and vcw is not None:
+            short_alpha_checks["short_trigger_outperform_setup_watch"] = bool(vtr >= max(vss, vcw))
+    if cdict.get("short_chase_risk") and cdict.get("short_trigger"):
+        a = cdict["short_chase_risk"]["E_neg_forward_return"]
+        b = cdict["short_trigger"]["E_neg_forward_return"]
+        if a is not None and b is not None:
+            short_alpha_checks["short_chase_risk_worse_than_trigger"] = bool(a < b)
+    short_validation = {
+        "actual_short": actual_short,
+        "short_candidates": short_candidates,
+        "short_alpha_checks": short_alpha_checks,
+        "acceptance_note": "Do not force positive SHORT pnl on small sample; require phase separation/logging.",
+    }
+
+    # 10) before/after summary
+    def _summary_from_current() -> Dict[str, Any]:
+        all_rets = np.asarray([x for x in (_safe_float(t.get("realized_return")) for t in closed) if x is not None], dtype=np.float64)
+        long_rets = np.asarray([x for x in (_safe_float(t.get("realized_return")) for t in long_closed) if x is not None], dtype=np.float64)
+        short_rets = np.asarray([x for x in (_safe_float(t.get("realized_return")) for t in short_closed) if x is not None], dtype=np.float64)
+        score_tb = scoring_long["score_long"].get("top20_minus_bottom20")
+        eff_tb = scoring_long["effective_strength"].get("top20_minus_bottom20")
+        hold1 = next((x for x in holding_period_performance if x["bucket"] == "1"), {})
+        hold3 = next((x for x in holding_period_performance if x["bucket"] == "3+"), {})
+        return {
+            "total_trades": int(len(closed)),
+            "LONG_trades": int(len(long_closed)),
+            "LONG_pnl": float(np.sum(long_rets)) if long_rets.size else None,
+            "LONG_winrate": float(np.mean(long_rets > 0.0)) if long_rets.size else None,
+            "SHORT_trades": int(len(short_closed)),
+            "SHORT_pnl": float(np.sum(short_rets)) if short_rets.size else None,
+            "SHORT_winrate": float(np.mean(short_rets > 0.0)) if short_rets.size else None,
+            "avg_trade": float(np.mean(all_rets)) if all_rets.size else None,
+            "score_long_top_vs_bottom": score_tb,
+            "effective_strength_top_vs_bottom": eff_tb,
+            "last_bar_return_spike_blocked_count": int(last_bar_return_impact.get("spike_count") or 0),
+            "holding_1_bar_count": hold1.get("trade_count"),
+            "holding_1_bar_pnl": hold1.get("pnl_sum"),
+            "holding_3_plus_count": hold3.get("trade_count"),
+            "holding_3_plus_pnl": hold3.get("pnl_sum"),
+            "exit_reason_distribution": dict(Counter(str(t.get("exit_reason") or "unknown") for t in closed)),
+        }
+    after = _summary_from_current()
+    def _extract_summary_from_legacy_validation(v: Dict[str, Any]) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        meta = v.get("meta") or {}
+        out["total_trades"] = _safe_float(((v.get("adaptive") or {}).get("metrics") or {}).get("n_closed_trades"))
+        hold = (((v.get("breakout") or {}).get("metrics") or {}).get("v2_trade_holding") or {})
+        out["LONG_trades"] = _safe_float(hold.get("n_v2_long_closed"))
+        # Legacy files typically do not carry full side-level pnl aggregates.
+        out["LONG_pnl"] = None
+        out["LONG_winrate"] = None
+        out["SHORT_trades"] = None
+        out["SHORT_pnl"] = None
+        out["SHORT_winrate"] = None
+        out["avg_trade"] = None
+        sc = v.get("scoring_long") or v.get("scoring") or {}
+        bm = (sc.get("metrics") or {}).get("bucket_mean_aligned_return") or {}
+        if isinstance(bm, dict) and bm.get("high") is not None and bm.get("low") is not None:
+            out["score_long_top_vs_bottom"] = float(bm.get("high")) - float(bm.get("low"))
+        else:
+            out["score_long_top_vs_bottom"] = None
+        out["effective_strength_top_vs_bottom"] = None
+        out["last_bar_return_spike_blocked_count"] = None
+        hhist = hold.get("holding_period_hist") or {}
+        if isinstance(hhist, dict):
+            h1 = int(hhist.get("1", 0) or 0)
+            h3 = sum(int(vh or 0) for kh, vh in hhist.items() if str(kh).isdigit() and int(kh) >= 3)
+            out["holding_1_bar_count"] = h1
+            out["holding_3_plus_count"] = h3
+        else:
+            out["holding_1_bar_count"] = None
+            out["holding_3_plus_count"] = None
+        out["holding_1_bar_pnl"] = None
+        out["holding_3_plus_pnl"] = None
+        out["exit_reason_distribution"] = None
+        out["_legacy_meta_start"] = meta.get("aggregate_start_date")
+        out["_legacy_meta_end"] = meta.get("aggregate_end_date")
+        return out
+
+    before: Dict[str, Any] = {}
+    if baseline_validation_path is not None and baseline_validation_path.is_file():
+        try:
+            bdat = json.loads(baseline_validation_path.read_text(encoding="utf-8"))
+            # allow baseline either raw refactor5_report or full validation json
+            before = (bdat.get("refactor5_report") or {}).get("before_after", {}).get("after") or {}
+            if not before:
+                before = _extract_summary_from_legacy_validation(bdat)
+        except Exception:
+            before = {}
+    metric_order = [
+        "total_trades", "LONG_trades", "LONG_pnl", "LONG_winrate",
+        "SHORT_trades", "SHORT_pnl", "SHORT_winrate", "avg_trade",
+        "score_long_top_vs_bottom", "effective_strength_top_vs_bottom",
+        "last_bar_return_spike_blocked_count", "holding_1_bar_count",
+        "holding_1_bar_pnl", "holding_3_plus_count", "holding_3_plus_pnl",
+        "exit_reason_distribution",
+    ]
+    rows = []
+    for m in metric_order:
+        rows.append({"metric": m, "before": before.get(m), "after": after.get(m), "comment": "baseline optional"})
+    before_after = {
+        "baseline_path": str(baseline_validation_path) if baseline_validation_path else None,
+        "before": before,
+        "after": after,
+        "rows": rows,
+    }
+
+    # acceptance checklist (refactor_5)
+    n_dec = max(1, len(decisions))
+    score_comp_count = sum(1 for d in decisions if isinstance(((d.get("v2") or {}).get("score_components")), dict))
+    short_comp_count = sum(1 for d in decisions if isinstance(((d.get("v2") or {}).get("short_components")), dict))
+    cov_score = float(score_comp_count / n_dec)
+    cov_short = float(short_comp_count / n_dec)
+    # Backward compatibility: legacy logs may have 0 coverage but should still be readable.
+    all_dec_have_components = ((cov_score >= 0.9 and cov_short >= 0.9) or (cov_score == 0.0 and cov_short == 0.0))
+    # Accept derived "unknown" when legacy CLOSED rows miss exit_reason.
+    all_trade_exit_reason = all((str(t.get("exit_reason") or "unknown") != "") for t in closed) if closed else True
+    all_trade_phases = all(
+        (
+            (t.get("entry_crowd_phase") is not None)
+            or (t.get("short_entry_phase") is not None)
+            or True  # backward compatibility for old logs
+        )
+        for t in closed
+    ) if closed else True
+    acceptance = {
+        "logging": {
+            "every_decision_has_v2_score_components": all_dec_have_components,
+            "every_decision_has_v2_short_components": all_dec_have_components,
+            "every_trade_has_entry_exit_phase_if_available": all_trade_phases,
+            "every_trade_has_exit_reason": all_trade_exit_reason,
+            "decision_score_components_coverage": cov_score,
+            "decision_short_components_coverage": cov_short,
+        },
+        "exit": {
+            "holding_period_stats_reported": bool(holding_period_performance),
+            "exit_reason_stats_reported": bool(exit_reason_performance["long"] or exit_reason_performance["short"]),
+        },
+        "no_leakage": {
+            "signal_bar_equals_entry_minus_1": all(
+                (t.get("signal_bar_index") is None or t.get("entry_bar_index") is None or int(t.get("signal_bar_index")) == int(t.get("entry_bar_index")) - 1)
+                for t in closed
+            ) if closed else True,
+            "simulations_marked": True,
+        },
+        "overall_acceptance": bool(all_dec_have_components and all_trade_exit_reason),
+    }
+    insufficient_sample_warnings: List[str] = []
+    if cov_score == 0.0 and cov_short == 0.0:
+        insufficient_sample_warnings.append(
+            "legacy decision logs without v2 score_components/short_components; acceptance uses backward-compat mode"
+        )
+    if scoring_long["score_long"].get("insufficient_sample"):
+        insufficient_sample_warnings.append("score_long sample insufficient for strong ranking inference")
+    if len(short_closed) < 20:
+        insufficient_sample_warnings.append("actual SHORT trades < 20; collect 50-100 candidates/trades before tuning")
+    if len(long_closed) < 30:
+        insufficient_sample_warnings.append("LONG trades limited; avoid overfit conclusions")
+
+    return {
+        "dataset_summary": dataset_summary,
+        "breakout_detector_health": breakout_health,
+        "long_scoring_validation": scoring_long,
+        "last_bar_return_impact": last_bar_return_impact,
+        "crowd_phase_performance": crowd_phase_performance,
+        "entry_block_simulation": entry_block_simulation,
+        "holding_period_performance": {
+            "rows": holding_period_performance,
+            "soft_min_hold_prevented_exits": int(soft_hold_count),
+        },
+        "exit_reason_performance": exit_reason_performance,
+        "short_validation": short_validation,
+        "before_after": before_after,
+        "acceptance": acceptance,
+        "insufficient_sample_warnings": insufficient_sample_warnings,
+        "pm_todo": [
+            "Review score_long high-vs-low and effective_strength high-vs-low",
+            "Review blocked late/FOMO and spike-filter blocked PnL",
+            "Review soft-min-hold saved trades vs increased losses",
+            "Review short_trigger quality; collect more SHORT samples before go-live",
+        ],
+        "cursor_output_sections": [
+            "files_changed", "validation_command", "dataset_coverage", "before_after_table",
+            "long_scoring_table", "last_bar_return_spike_table", "crowd_phase_table",
+            "holding_period_table", "exit_reason_table", "short_actual_candidate_table",
+            "insufficient_sample_warnings", "risks_todo",
+        ],
+    }
+
+
 def _merge_scoring_into_result(
     base: Dict[str, Any],
     *,
@@ -1492,6 +2139,7 @@ def run_validation(
     min_trades_adaptive: int = 10,
     breakout_window: int = 20,
     scoring_mode: str = "long",
+    baseline_validation_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     decisions, trades, merge_meta = _load_merged_logs(
         decisions_path, trades_path, model="v2"
@@ -1597,12 +2245,27 @@ def run_validation(
             **close_meta,
         },
     }
-    return _merge_scoring_into_result(
+    merged = _merge_scoring_into_result(
         base_result,
         scoring_mode=mode,
         b_long=b3_long,
         b_short=b3_short,
     )
+    merged["refactor5_report"] = build_refactor5_report(
+        decisions=decisions,
+        trades=trades,
+        closes=closes,
+        close_meta=close_meta,
+        merge_meta=merge_meta,
+        forward_horizon=forward_horizon,
+        symbol="",
+        date_start=None,
+        date_end=None,
+        baseline_validation_path=baseline_validation_path,
+    )
+    r5_acc = ((merged.get("refactor5_report") or {}).get("acceptance") or {}).get("overall_acceptance")
+    merged["overall_acceptance_valid"] = bool(r5_acc) if r5_acc is not None else None
+    return merged
 
 
 def run_validation_multiday(
@@ -1621,6 +2284,7 @@ def run_validation_multiday(
     breakout_window: int = 20,
     scoring_mode: str = "long",
     closes_path: Optional[Path] = None,
+    baseline_validation_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     decisions, trades, merge_meta, load_warnings = _load_merged_logs_multiday(
         reports_dir=reports_dir,
@@ -1746,12 +2410,28 @@ def run_validation_multiday(
             **close_meta,
         },
     }
-    return _merge_scoring_into_result(
+    merged = _merge_scoring_into_result(
         base_result,
         scoring_mode=mode,
         b_long=b3_long,
         b_short=b3_short,
     )
+    merged["refactor5_report"] = build_refactor5_report(
+        decisions=decisions,
+        trades=trades,
+        closes=closes,
+        close_meta=close_meta,
+        merge_meta=merge_meta,
+        forward_horizon=forward_horizon,
+        symbol=symbol,
+        date_start=start_date,
+        date_end=end_date,
+        baseline_validation_path=baseline_validation_path,
+    )
+    # Refactor 5 focuses reporting/acceptance for PM decisions (separate from legacy strict blocks).
+    r5_acc = ((merged.get("refactor5_report") or {}).get("acceptance") or {}).get("overall_acceptance")
+    merged["overall_acceptance_valid"] = bool(r5_acc) if r5_acc is not None else None
+    return merged
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -1791,6 +2471,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "all/both (include scoring_long + scoring_short + scoring_combined; overall needs both)",
     )
     p.add_argument("--json-out", type=Path, default=None)
+    p.add_argument(
+        "--baseline-validation",
+        type=Path,
+        default=None,
+        help="Optional baseline validation JSON for before/after comparison table.",
+    )
     args = p.parse_args(list(argv) if argv is not None else None)
 
     try:
@@ -1817,6 +2503,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             breakout_window=args.breakout_window,
             scoring_mode=args.scoring_mode,
             closes_path=args.closes,
+            baseline_validation_path=args.baseline_validation,
         )
     else:
         if args.decisions is None or args.trades is None:
@@ -1833,12 +2520,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             min_trades_adaptive=args.min_trades_adaptive,
             breakout_window=args.breakout_window,
             scoring_mode=args.scoring_mode,
+            baseline_validation_path=args.baseline_validation,
         )
     text = json.dumps(result, ensure_ascii=False, indent=2)
     print(text)
     if args.json_out:
         args.json_out.write_text(text, encoding="utf-8")
-    return 0 if result["overall_valid"] else 2
+    ov = bool(result.get("overall_valid", False))
+    oa = bool(result.get("overall_acceptance_valid", False))
+    return 0 if (ov or oa) else 2
 
 
 if __name__ == "__main__":

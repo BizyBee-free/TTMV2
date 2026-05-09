@@ -289,6 +289,62 @@ def test_scoring_short_prefers_feature_short_score(tmp_path: Path) -> None:
     assert r["scoring_short"]["passed"] is True
 
 
+def test_refactor5_report_sections_present(tmp_path: Path) -> None:
+    n = 40
+    closes = [100.0 + 0.01 * i for i in range(n)]
+    (tmp_path / "closes.json").write_text(json.dumps(closes), encoding="utf-8")
+    decisions = []
+    for i in range(n):
+        decisions.append(
+            {
+                "event_type": "decision",
+                "bar_index": i,
+                "timestamp": str(1700000000 + i * 300),
+                "features": {
+                    "breakout_strength": 1.0 if i % 5 == 0 else 0.0,
+                    "raw_strength": 1.0 if i % 5 == 0 else 0.0,
+                    "effective_strength": 0.1 * (i % 5),
+                    "last_bar_return": 0.001 * ((i % 3) - 1),
+                    "breakout_up_filtered_last": bool(i % 5 == 0),
+                },
+                "v2": {
+                    "score_long": 0.1 * (i % 7),
+                    "score_short": -0.1 * (i % 7),
+                    "score_components": {"positive_last_bar_return": 0.2, "crowd_phase": "ignition"},
+                    "short_components": {"short_phase": "short_setup", "short_score": 0.3},
+                    "log": {"crowd_phase": "ignition"},
+                },
+            }
+        )
+    trades = [
+        {
+            "event_type": "trade",
+            "model": "v2",
+            "event": "CLOSED",
+            "bar_index": 10,
+            "entry_bar_index": 8,
+            "exit_bar_index": 10,
+            "side": "LONG",
+            "realized_return": 0.001,
+            "holding_period": 2,
+            "entry_crowd_phase": "ignition",
+            "exit_reason": "score_decay",
+            "signal_bar_index": 7,
+        }
+    ]
+    dec = tmp_path / "dec.jsonl"
+    trd = tmp_path / "tr.jsonl"
+    _write_jsonl(dec, decisions)
+    _write_jsonl(trd, trades)
+    r = run_validation(dec, trd, closes_path=(tmp_path / "closes.json"), min_trades_adaptive=1)
+    r5 = r.get("refactor5_report") or {}
+    assert "dataset_summary" in r5
+    assert "long_scoring_validation" in r5
+    assert "exit_reason_performance" in r5
+    assert "short_validation" in r5
+    assert "acceptance" in r5
+
+
 @pytest.mark.parametrize(
     "fname",
     [

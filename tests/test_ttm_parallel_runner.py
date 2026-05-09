@@ -10,7 +10,11 @@ import pytest
 
 from src.backtest.data_fetcher import OhlcBar
 from src.strategies.ttm.config import TTM_CONFIG
-from src.strategies.ttm.ttm_parallel_runner import ParallelRunner, replay_bars
+from src.strategies.ttm.ttm_parallel_runner import (
+    ParallelRunner,
+    _V2_CLOSED_TRADE_FLAT_DEFAULTS,
+    replay_bars,
+)
 
 
 def _bars(n: int = 80) -> list[OhlcBar]:
@@ -37,6 +41,11 @@ def _bars(n: int = 80) -> list[OhlcBar]:
         )
         p = c
     return bars
+
+
+def test_ttm_config_includes_refactor1_max_hold_bars() -> None:
+    assert "ttm_v2_max_hold_bars" in TTM_CONFIG
+    assert TTM_CONFIG["ttm_v2_max_hold_bars"] is None
 
 
 def test_parallel_runner_jsonl_and_summary(tmp_path: Path) -> None:
@@ -86,6 +95,12 @@ def test_parallel_runner_jsonl_and_summary(tmp_path: Path) -> None:
         assert "effective_strength" in obj["features"]
         assert "signal" in obj["v1"] or "reason_block" in obj["v1"]
         assert "blocked_by" in obj["v2"]
+        assert "score_components" in obj["v2"]
+        assert "short_components" in obj["v2"]
+        assert isinstance(obj["v2"]["score_components"], dict)
+        assert isinstance(obj["v2"]["short_components"], dict)
+        assert "crowd_phase" in obj["v2"]["log"]
+        assert "short_phase" in obj["v2"]["log"]
         assert "position_state" in obj
         ps = obj["position_state"]
         assert ps["v1_is_open"] is False or ps["v1_side"] in ("LONG", "SHORT")
@@ -121,6 +136,10 @@ def test_v2_exit_trade_rows_include_entry_trace_fields(tmp_path: Path) -> None:
         assert "entry_bar_index" in o
         assert isinstance(o["entry_bar_index"], int)
         assert o["entry_bar_index"] >= 0
+        for k in _V2_CLOSED_TRADE_FLAT_DEFAULTS:
+            assert k in o
+        assert o["signal_bar_index"] == int(o["entry_bar_index"]) - 1
+        assert o["holding_bars"] == o.get("holding_period")
 
 
 def test_parallel_runner_deterministic() -> None:

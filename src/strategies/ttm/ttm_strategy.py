@@ -72,6 +72,17 @@ class TTMStrategy(BaseStrategy):
                         bar_ts = int(lb["unix_ts"])
                     except (TypeError, ValueError):
                         bar_ts = None
+        v2_pos_ctx: Dict[str, Any] = {}
+        if isinstance(state, dict):
+            for _k in (
+                "holding_bars",
+                "position_unrealized_return",
+                "entry_snapshot",
+                "position_meta",
+                "current_price",
+            ):
+                if state.get(_k) is not None:
+                    v2_pos_ctx[_k] = state[_k]
         signal = generate_ttm_signal_v2(
             data,
             self.config,
@@ -80,6 +91,7 @@ class TTMStrategy(BaseStrategy):
             adaptive=self.adaptive_context,
             empirical_engine=self.empirical_engine,
             bar_timestamp=bar_ts,
+            **v2_pos_ctx,
         )
         signal["strategy"] = "TTM"
         logger.info(

@@ -1,4 +1,4 @@
-"""TTM V2 — unified bounded score + softmax; prob-only signal exits (no legacy rule exits)."""
+"""TTM V2 — unified bounded score + softmax; default prob-only exits, optional continuation-aware ordering."""
 
 from __future__ import annotations
 
@@ -12,6 +12,11 @@ from src.strategies.ttm.ttm_features import compute_ttm_features_from_config, fe
 from src.strategies.ttm.ttm_regime import detect_regime
 from src.strategies.ttm.empirical.alpha import compute_empirical_alpha, empirical_alpha_to_score_delta
 from src.strategies.ttm.ttm_score import compute_score_v2_alpha, probs_valid, scores_to_probs
+from src.strategies.ttm.ttm_v2_exit_continuation import (
+    decide_long_exit_continuation,
+    decide_short_exit_continuation,
+)
+from src.strategies.ttm.ttm_v2_phases import classify_crowd_phase, classify_short_phase
 from src.strategies.ttm.ttm_signal import (
     _emit_signal,
     _merge_last_with_ohlc,
@@ -32,7 +37,14 @@ def _merge_ttm_config(config: Mapping[str, Any], adaptive: Optional[Any]) -> Dic
     return merged
 
 
-def _top_component_names(components: Mapping[str, float], n: int = 3) -> list[str]:
+def _abs_rankable(x: Any) -> float:
+    try:
+        return abs(float(x))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _top_component_names(components: Mapping[str, Any], n: int = 3) -> list[str]:
     skip = (
         "total_long",
         "total_short",
@@ -41,10 +53,68 @@ def _top_component_names(components: Mapping[str, float], n: int = 3) -> list[st
         "prob_short",
         "momentum",
         "vol_breakout_interaction_factor",
+        "crowd_phase",
+        "entry_block_reason",
+        "late_fomo_flag",
+        "short_candidate",
+        "short_chase_risk",
+        "crowded_long_pressure",
+        "continuation_decay",
+        "rejection_confirm",
+        "failed_breakout_confirm",
+        "downside_momentum_confirm",
+        "early_continuation_still_alive",
+        "short_effective_strength_raw",
+        "short_effective_strength",
+        "short_score_unit",
+        "prior_upside_breakout_exists",
     )
     keys = [k for k in components if k not in skip]
-    ranked = sorted(keys, key=lambda k: abs(float(components.get(k, 0.0))), reverse=True)
+    ranked = sorted(keys, key=lambda k: _abs_rankable(components.get(k, 0.0)), reverse=True)
     return ranked[:n]
+
+
+def _pack_v2_short_components(components: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "prior_upside_breakout_exists": components.get("prior_upside_breakout_exists"),
+        "last_upside_breakout_bar_index": components.get("last_upside_breakout_bar_index"),
+        "bars_since_upside_breakout": components.get("bars_since_upside_breakout"),
+        "crowded_long_pressure": components.get("crowded_long_pressure"),
+        "continuation_decay": components.get("continuation_decay"),
+        "rejection_confirm": components.get("rejection_confirm"),
+        "failed_breakout_confirm": components.get("failed_breakout_confirm"),
+        "downside_momentum_confirm": components.get("downside_momentum_confirm"),
+        "early_continuation_still_alive": components.get("early_continuation_still_alive"),
+        "short_chase_risk": components.get("short_chase_risk"),
+        "short_effective_strength_raw": components.get("short_effective_strength_raw"),
+        "short_effective_strength": components.get("short_effective_strength"),
+        "short_score": components.get("short_score_unit", components.get("short_score")),
+        "short_phase": components.get("short_phase"),
+        "short_candidate": components.get("short_candidate"),
+        "short_block_reason": components.get("short_block_reason"),
+        "short_reason": components.get("short_reason"),
+    }
+
+
+def _pack_v2_score_components(components: Mapping[str, Any]) -> Dict[str, Any]:
+    eraw = components.get("effective_strength_v3_raw", components.get("alpha_raw_long"))
+    return {
+        "breakout_conviction": components.get("breakout_conviction"),
+        "continuation_confirm": components.get("continuation_confirm"),
+        "basis_confirm": components.get("basis_confirm"),
+        "extension": components.get("extension"),
+        "extension_sq": components.get("extension_sq"),
+        "last_bar_return_raw": components.get("last_bar_return_raw"),
+        "last_bar_return_norm": components.get("last_bar_return_norm"),
+        "positive_last_bar_return": components.get("positive_last_bar_return"),
+        "late_phase_penalty": components.get("late_phase_penalty"),
+        "effective_strength_raw": eraw,
+        "effective_strength": components.get("effective_strength_last"),
+        "score_long": components.get("score_long"),
+        "crowd_phase": components.get("crowd_phase"),
+        "late_fomo_flag": components.get("late_fomo_flag"),
+        "entry_block_reason": components.get("entry_block_reason"),
+    }
 
 
 def _v2_vol_confirm_confidence(
@@ -96,6 +166,11 @@ def generate_ttm_signal_v2(
     adaptive: Optional[Any] = None,
     empirical_engine: Optional[Any] = None,
     bar_timestamp: Optional[int] = None,
+    holding_bars: Optional[int] = None,
+    position_unrealized_return: Optional[float] = None,
+    entry_snapshot: Optional[Mapping[str, Any]] = None,
+    position_meta: Optional[Mapping[str, Any]] = None,
+    current_price: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Intraday alpha from :func:`~src.strategies.ttm.ttm_score.compute_score_v2_alpha` (breakout uses
@@ -104,7 +179,9 @@ def generate_ttm_signal_v2(
     (see ``ttm_v2_position_size_vol_k`` on features passed to execution).
 
     Flat entry: ``prob_long`` / ``prob_short`` vs ``entry_threshold`` (mặc định :data:`ENTRY_THRESHOLD`).
-    In-position exit: **prob-only** (``prob_* < prob_exit_threshold``) — no momentum/squeeze/basis rule exits.
+    In-position exit: **prob-only** by default; with ``ttm_v2_enable_continuation_aware_exit``,
+    structured ordering (refactor_4) using optional ``holding_bars``, ``position_unrealized_return``,
+    ``entry_snapshot`` / ``position_meta`` when provided by the runner/strategy.
 
     Optional ``empirical_engine`` (:class:`~src.strategies.ttm.empirical.EmpiricalAlphaEngine`): rolling
     bin curves vs forward return — **separate** from :class:`~src.strategies.ttm.ttm_adaptive_context.TTMAdaptiveContext`
@@ -196,6 +273,8 @@ def generate_ttm_signal_v2(
     feat_pack["short_setup_cap"] = _masked_last_optional(last, "short_setup_cap")
     feat_pack["extension"] = _masked_last_optional(last, "extension")
     feat_pack["last_bar_return"] = _masked_last_optional(last, "last_bar_return")
+    feat_pack["rolling_high"] = _masked_last_optional(last, "rolling_high")
+    feat_pack["atr"] = _masked_last_optional(last, "atr")
     feat_pack["effective_strength_pre_gate"] = _masked_last_optional(last, "effective_strength_pre_gate")
     feat_pack["effective_strength_active"] = bool(last.get("effective_strength_active"))
     feat_pack["effective_strength"] = _masked_last_optional(last, "effective_strength")
@@ -258,11 +337,25 @@ def generate_ttm_signal_v2(
                 **dict(components),
                 "edge": edge,
                 "empirical_blend_delta": float(delta),
+                "score_long": float(sl),
+                "score": float(sl),
+                "total_long": float(sl),
             }
 
     breakout_strength_down = float(last.get("breakout_strength_down") or 0.0)
     short_score_last = _masked_last_optional(last, "short_score")
-    short_signal = bool(last.get("exhaustion_confirm"))
+    enable_short = bool(cfg_work.get("ttm_v2_enable_short_trading", True))
+    use_short_v3 = bool(cfg_work.get("ttm_v2_use_short_effective_strength_v3", False))
+    if use_short_v3:
+        short_signal = bool(
+            enable_short
+            and str(components.get("short_phase") or "") == "short_trigger"
+            and bool(components.get("short_candidate"))
+        )
+    else:
+        short_signal = bool(last.get("exhaustion_confirm"))
+    if not enable_short:
+        short_signal = False
     long_signal = bool(last.get("breakout_up"))
 
     def _debug_core() -> Dict[str, Any]:
@@ -305,10 +398,86 @@ def generate_ttm_signal_v2(
             "feature_valid_mask": dict(last.get("feature_valid_mask") or {}),
             "top_components": _top_component_names(components, 3),
             "oi_context_flag": last.get("oi_context_flag"),
+            "crowd_phase": components.get("crowd_phase") or classify_crowd_phase(last, cfg_work),
+            "short_phase": components.get("short_phase") or classify_short_phase(last, cfg_work),
+            "v2_score_components": _pack_v2_score_components(components),
+            "v2_short_components": _pack_v2_short_components(components),
             **empirical_debug,
         }
 
     if side_u == "LONG":
+        if bool(cfg_work.get("ttm_v2_enable_continuation_aware_exit")):
+            act_l, canon_l, x_l = decide_long_exit_continuation(
+                ok=ok,
+                pl=float(pl),
+                prob_exit=prob_exit,
+                score_long=float(sl),
+                last=last,
+                components=components,
+                cfg=cfg_work,
+                holding_bars=holding_bars,
+                unrealized_return=position_unrealized_return,
+                entry_snapshot=entry_snapshot,
+            )
+            if act_l == "EXIT":
+                out = {
+                    "action": "EXIT",
+                    "confidence": float(pl),
+                    "reason": str(canon_l),
+                    "strategy": "TTM",
+                    "features": feat_pack,
+                    "debug": {**_debug_core(), "exit_channel": "continuation", **x_l},
+                }
+                tr_pd = {
+                    "stage": "exit",
+                    "bar_index": bar_index_exit,
+                    "position_side": "LONG",
+                    "action": "EXIT",
+                    "reason": str(canon_l),
+                    "model_version": "v2",
+                }
+                return _emit_signal(out, tr_pd, print_trace)
+            if act_l == "HOLD" and canon_l == "soft_min_hold_continuation":
+                tr_sm = {
+                    "stage": "exit",
+                    "bar_index": bar_index_exit,
+                    "position_side": "LONG",
+                    "action": "HOLD",
+                    "reason": "soft_min_hold_continuation",
+                    "model_version": "v2",
+                }
+                return _emit_signal(
+                    {
+                        "action": "HOLD",
+                        "confidence": float(pl),
+                        "reason": "soft_min_hold_continuation",
+                        "strategy": "TTM",
+                        "features": feat_pack,
+                        "debug": {**_debug_core(), **x_l},
+                    },
+                    tr_sm,
+                    print_trace,
+                )
+            tr_hex = {
+                "stage": "exit",
+                "bar_index": bar_index_exit,
+                "position_side": "LONG",
+                "action": "HOLD",
+                "reason": "no_exit_signal",
+                "model_version": "v2",
+            }
+            return _emit_signal(
+                {
+                    "action": "HOLD",
+                    "confidence": 0.0,
+                    "reason": "no_exit_signal",
+                    "strategy": "TTM",
+                    "features": feat_pack,
+                    "debug": {**_debug_core(), **x_l},
+                },
+                tr_hex,
+                print_trace,
+            )
         if ok and pl < prob_exit:
             out = {
                 "action": "EXIT",
@@ -349,6 +518,58 @@ def generate_ttm_signal_v2(
         )
 
     if side_u == "SHORT":
+        if bool(cfg_work.get("ttm_v2_enable_continuation_aware_exit")):
+            px_s = float(current_price) if current_price is not None else float(last.get("close") or 0.0)
+            act_s, canon_s, x_s = decide_short_exit_continuation(
+                ok=ok,
+                ps=float(ps),
+                prob_exit=prob_exit,
+                last=last,
+                components=components,
+                cfg=cfg_work,
+                holding_bars=holding_bars,
+                unrealized_return=position_unrealized_return,
+                position_meta=position_meta,
+                current_price=px_s,
+            )
+            if act_s == "EXIT":
+                out = {
+                    "action": "EXIT",
+                    "confidence": float(ps),
+                    "reason": str(canon_s),
+                    "strategy": "TTM",
+                    "features": feat_pack,
+                    "debug": {**_debug_core(), "exit_channel": "continuation", **x_s},
+                }
+                tr_pds = {
+                    "stage": "exit",
+                    "bar_index": bar_index_exit,
+                    "position_side": "SHORT",
+                    "action": "EXIT",
+                    "reason": str(canon_s),
+                    "model_version": "v2",
+                }
+                return _emit_signal(out, tr_pds, print_trace)
+            tr_hxs = {
+                "stage": "exit",
+                "bar_index": bar_index_exit,
+                "position_side": "SHORT",
+                "action": "HOLD",
+                "reason": "no_exit_signal",
+                "model_version": "v2",
+            }
+            return _emit_signal(
+                {
+                    "action": "HOLD",
+                    "confidence": 0.0,
+                    "reason": "no_exit_signal",
+                    "strategy": "TTM",
+                    "features": feat_pack,
+                    "debug": {**_debug_core(), **x_s},
+                },
+                tr_hxs,
+                print_trace,
+            )
         if ok and ps < prob_exit:
             out = {
                 "action": "EXIT",
@@ -455,6 +676,10 @@ def generate_ttm_signal_v2(
         "top_components": _top_component_names(components, 3),
         "model_version": "v2",
         "probs_valid": ok,
+        "crowd_phase": components.get("crowd_phase") or classify_crowd_phase(last, cfg_work),
+        "short_phase": components.get("short_phase") or classify_short_phase(last, cfg_work),
+        "v2_score_components": _pack_v2_score_components(components),
+        "v2_short_components": _pack_v2_short_components(components),
     }
     logger.info(
         "TTM V2 unified score",
@@ -525,6 +750,49 @@ def generate_ttm_signal_v2(
     if print_trace:
         print(f"FINAL DECISION: {decision_entry}", flush=True)
 
+    if decision_entry == "LONG":
+        if bool(cfg_work.get("ttm_v2_use_effective_strength_v3")):
+            cp = str(components.get("crowd_phase") or "")
+            if cp and cp not in ("ignition", "early_continuation"):
+                return _log_hold(
+                    "crowd_phase_block",
+                    {
+                        "crowd_phase": cp,
+                        "entry_block_reason": components.get("entry_block_reason"),
+                        "decision_source": "crowd_phase_gate",
+                    },
+                )
+        if bool(cfg_work.get("ttm_v2_enable_late_fomo_filter")):
+            lf = components.get("late_fomo_flag")
+            if lf is True:
+                return _log_hold(
+                    "late_fomo_filter",
+                    {"late_fomo_flag": True, "decision_source": "late_fomo_gate"},
+                )
+        if bool(cfg_work.get("ttm_v2_enable_entry_confirmation")):
+            thr_sl = float(cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0))
+            if float(sl) < thr_sl:
+                return _log_hold(
+                    "score_below_threshold",
+                    {"score_long": sl, "ttm_v2_score_long_entry_threshold": thr_sl},
+                )
+            if bool(last.get("exhaustion_confirm")):
+                return _log_hold("exhaustion_confirm_block", {})
+            pos_lb = components.get("positive_last_bar_return")
+            if pos_lb is None:
+                lbv = float(last.get("last_bar_return") or 0.0)
+                pos_lb = max(0.0, float(np.tanh(lbv * 6.0)))
+            else:
+                pos_lb = float(pos_lb)
+            lb_thr = cfg_work.get("ttm_v2_last_bar_return_spike_threshold")
+            if lb_thr is not None and pos_lb > float(lb_thr):
+                return _log_hold(
+                    "last_bar_return_spike",
+                    {"positive_last_bar_return": pos_lb, "threshold": float(lb_thr)},
+                )
+            if bool(components.get("late_fomo_flag")):
+                return _log_hold("late_fomo_entry_confirm", {})
+
     if ok and decision_entry == "LONG" and pl <= entry_thr:
         raise RuntimeError(
             "INCONSISTENT: LONG but prob_long not above threshold "
@@ -543,7 +811,8 @@ def generate_ttm_signal_v2(
     if ok and decision_entry == "SHORT" and not short_signal:
         raise RuntimeError(
             "INCONSISTENT: SHORT while short_signal is False "
-            f"(exhaustion_confirm={bool(last.get('exhaustion_confirm'))}, short_score={short_score_last})"
+            f"(exhaustion_confirm={bool(last.get('exhaustion_confirm'))}, short_v3={use_short_v3}, "
+            f"short_phase={components.get('short_phase')}, short_candidate={components.get('short_candidate')})"
         )
 
     if decision_entry == "NONE":
@@ -600,17 +869,24 @@ def generate_ttm_signal_v2(
         breakout_align=bool(short_signal),
         cfg=cfg_work,
     )
+    short_reason_lbl = (
+        "softmax_entry_short_crowd_unwind" if use_short_v3 else "softmax_entry_short_exhaustion"
+    )
+    short_ds = "short_opportunity_v3" if use_short_v3 else "exhaustion_confirm"
+    feat_out = dict(feat_pack)
+    if use_short_v3:
+        feat_out["ttm_v2_short_setup"] = "short_opportunity_v3"
     out = {
         "action": "SHORT",
         "confidence": conf,
-        "reason": "softmax_entry_short_exhaustion",
+        "reason": short_reason_lbl,
         "strategy": "TTM",
         "trap_score": float(ss),
-        "features": feat_pack,
+        "features": feat_out,
         "debug": {
             **debug_payload,
             "entry": "softmax",
-            "decision_source": "exhaustion_confirm",
+            "decision_source": short_ds,
             "entry_threshold": entry_thr,
             "vol_confirm_applied": vol_conf_applied,
         },
@@ -619,7 +895,7 @@ def generate_ttm_signal_v2(
         "stage": "entry",
         "bar_index": n - 1,
         "action": "SHORT",
-        "reason": "softmax_entry_short_exhaustion",
+        "reason": short_reason_lbl,
         "model_version": "v2",
     }
     return _emit_signal(out, tr_s, print_trace)

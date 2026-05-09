@@ -209,6 +209,66 @@ TTM_CONFIG: Dict[str, Any] = {
     "ttm_v2_empirical_no_trade_abs": 0.0,
     "ttm_v2_empirical_size_min": 0.5,
     "ttm_v2_empirical_size_max": 2.0,
+    # --- TTM V2 REFACTOR (crowd-alpha model) ---
+    # Core feature toggles (off by default = legacy behavior)
+    "ttm_v2_use_effective_strength_v3": False,
+    "ttm_v2_enable_late_fomo_filter": False,
+    "ttm_v2_enable_entry_confirmation": False,
+    "ttm_v2_enable_soft_min_hold": False,
+    # SHORT paper optimization
+    "ttm_v2_enable_short_trading": True,
+    "ttm_v2_enable_short_trading_default_paper": True,
+    "ttm_v2_enable_short_trading_default_live": False,
+    "ttm_v2_enable_short_candidate_logging": True,
+    "ttm_v2_use_short_effective_strength_v3": False,
+    "ttm_v2_enable_short_anti_chase": True,
+    # LONG weights
+    "ttm_v2_w_breakout_conviction": 1.0,
+    "ttm_v2_w_continuation_confirm": 0.5,
+    "ttm_v2_w_basis_confirm": 0.2,
+    "ttm_v2_w_extension": 0.5,
+    "ttm_v2_w_extension_sq": 0.2,
+    "ttm_v2_w_positive_last_bar_return": 0.5,
+    "ttm_v2_w_late_phase_penalty": 0.7,
+    # SHORT weights
+    "ttm_v2_w_crowded_long_pressure": 1.0,
+    "ttm_v2_w_continuation_decay": 0.8,
+    "ttm_v2_w_rejection_confirm": 0.8,
+    "ttm_v2_w_failed_breakout_confirm": 0.8,
+    "ttm_v2_w_downside_momentum_confirm": 0.5,
+    "ttm_v2_w_early_continuation_still_alive": 1.0,
+    "ttm_v2_w_short_chase_risk": 0.8,
+    # LONG thresholds
+    "ttm_v2_score_long_entry_threshold": 0.0,
+    "ttm_v2_late_fomo_threshold": 0.7,
+    "ttm_v2_last_bar_return_spike_threshold": None,
+    "ttm_v2_extension_late_threshold": None,
+    "ttm_v2_continuation_exit_threshold": 0.0,
+    "ttm_v2_soft_min_hold_bars": 2,
+    "ttm_v2_max_hold_bars": None,
+    # Continuation-aware exit (refactor_4); False = legacy prob-only in-position exit in signal.
+    "ttm_v2_enable_continuation_aware_exit": False,
+    "ttm_v2_target_alpha_hold_bars": 3,
+    "ttm_v2_failed_breakout_failure_min": 0.35,
+    "ttm_v2_exhaustion_rejection_threshold": 0.25,
+    "ttm_v2_score_decay_relative": 0.65,
+    # Bar-close return exits (parallel runner / strategy); defaults match runner fallbacks.
+    "ttm_v2_sl_return": -0.0007,
+    "ttm_v2_tp_return": 0.0015,
+    "ttm_v2_time_stop_bars": 4,
+    "ttm_v2_sl_return_short": -0.0007,
+    "ttm_v2_tp_return_short": 0.0015,
+    "ttm_v2_time_stop_bars_short": 4,
+    # SHORT thresholds
+    "ttm_v2_short_entry_threshold": 0.0,
+    "ttm_v2_short_trigger_threshold": 0.5,
+    "ttm_v2_short_chase_risk_threshold": 0.7,
+    "ttm_v2_short_max_hold_bars": None,
+    "ttm_v2_short_continuation_recovery_threshold": 0.5,
+    "ttm_v2_short_downside_decay_threshold": 0.0,
+    "ttm_v2_bars_since_breakout_min_for_short": 1,
+    "ttm_v2_bars_since_breakout_max_for_short": 20,
+    "ttm_v2_short_prior_breakout_lookback": 40,
 }
 
 
@@ -227,6 +287,9 @@ def build_ttm_research_parallel_config(extra: Optional[Mapping[str, Any]] = None
     cfg["ttm_assert_adaptive_wired"] = False
     cfg["decision_trace_print"] = False
     cfg["session_flatten_enabled"] = True
+    cfg["ttm_v2_enable_short_trading"] = bool(
+        cfg.get("ttm_v2_enable_short_trading_default_paper", True)
+    )
     if extra:
         cfg.update(dict(extra))
     return cfg
@@ -245,6 +308,9 @@ def build_ttm_live_adaptive_config(extra: Optional[Mapping[str, Any]] = None) ->
     cfg["ttm_strict_feature_finite"] = True
     cfg["ttm_assert_adaptive_wired"] = True
     cfg["decision_trace_print"] = False
+    cfg["ttm_v2_enable_short_trading"] = bool(
+        cfg.get("ttm_v2_enable_short_trading_default_live", False)
+    )
     if extra:
         cfg.update(dict(extra))
     return cfg

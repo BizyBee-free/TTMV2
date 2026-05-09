@@ -1,0 +1,302 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 55,
+      "n_non_breakout_bars": 913,
+      "n_raw_breakout_up_bars": 109,
+      "n_valid_breakout_up_bars": 55,
+      "raw_breakout_up_ratio": 0.056818181818181816,
+      "valid_breakout_up_ratio": 0.5045871559633027,
+      "true_breakout_rate": 0.5596330275229358,
+      "trap_detection_rate": 0.1834862385321101,
+      "trap_threshold": 0.0005,
+      "total_adverse_breakouts": 20,
+      "detected_traps": 20,
+      "trap_candidates": 109,
+      "mannwhitney_strength_high_vs_low_p_value": 0.32336189874714527,
+      "mannwhitney_strength_high_vs_low_stat": 138.0,
+      "breakout_return_stats": {
+        "full_sample": {
+          "n": 55,
+          "mean_return": 0.0003407545490852064,
+          "winrate": 0.6,
+          "top_20_return_mean": 0.0019025355314953342,
+          "bottom_20_return_mean": -0.0012145736017601081
+        },
+        "non_zero_sample": {
+          "n": 53,
+          "mean_return": 0.00035361321131483685,
+          "winrate": 0.6226415094339622,
+          "top_20_return_mean": 0.0019025355314953342,
+          "bottom_20_return_mean": -0.0012145736017601081
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 1.2858662229630431e-05,
+          "non_zero_minus_full_winrate": 0.02264150943396226,
+          "non_zero_minus_full_top_20_return_mean": 0.0,
+          "non_zero_minus_full_bottom_20_return_mean": 0.0,
+          "zero_return_count": 2
+        }
+      },
+      "non_breakout_return_stats": {
+        "full_sample": {
+          "n": 913,
+          "mean_return": 5.558445740234439e-05,
+          "winrate": 0.48630887185104055,
+          "top_20_return_mean": 0.0018211838974128802,
+          "bottom_20_return_mean": -0.0015912158821490801
+        },
+        "non_zero_sample": {
+          "n": 886,
+          "mean_return": 5.727834041573413e-05,
+          "winrate": 0.5011286681715575,
+          "top_20_return_mean": 0.0018469961975091966,
+          "bottom_20_return_mean": -0.0016130055190912071
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 1.693883013389742e-06,
+          "non_zero_minus_full_winrate": 0.014819796320516998,
+          "non_zero_minus_full_top_20_return_mean": 2.5812300096316344e-05,
+          "non_zero_minus_full_bottom_20_return_mean": -2.1789636942127003e-05,
+          "zero_return_count": 27
+        }
+      },
+      "breakout_up_eval": {
+        "n_is_breakout_up": 55,
+        "n_breakout_up": 55,
+        "ret_2_mean": 0.00042941480828690234,
+        "ret_3_mean": 0.00035339204542711536,
+        "ret_4_mean": 0.0003407545490852064,
+        "ret_4_winrate": 0.6,
+        "ret_4_sharpe": 0.30347777848184204,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 19,
+            "mean_ret_4": 0.0005810263833609452,
+            "winrate_ret_4": 0.7894736842105263
+          },
+          {
+            "bucket": "mid",
+            "n": 18,
+            "mean_ret_4": 0.0001883219886858706,
+            "winrate_ret_4": 0.3888888888888889
+          },
+          {
+            "bucket": "high",
+            "n": 18,
+            "mean_ret_4": 0.00023956683997126233,
+            "winrate_ret_4": 0.6111111111111112
+          }
+        ],
+        "monotonic_low_mid_high": false,
+        "strength_validation_mode": "strong_mannwhitney",
+        "mean_ret_4_high_minus_low": -0.00034145954338968287,
+        "strength_axis": "raw_strength",
+        "mean_ret_low": 0.0005810263833609452,
+        "mean_ret_mid": 0.0001883219886858706,
+        "mean_ret_high": 0.00023956683997126233,
+        "mean_mid_ge_mean_high": false,
+        "anti_inverted_u_ok": false
+      },
+      "breakout_down_eval": {
+        "n_is_breakout_down": 0,
+        "ret_4_short_mean_return": null,
+        "ret_4_short_winrate": null,
+        "ret_4_short_sharpe": null,
+        "bucket_table": [],
+        "monotonic_low_mid_high": null
+      },
+      "v2_trade_holding": {
+        "n_v2_long_closed": 34,
+        "n_v2_closed_all_sides": 39,
+        "pct_holding_period_eq_1": 0.47058823529411764,
+        "holding_period_hist": {
+          "2": 7,
+          "1": 16,
+          "4": 5,
+          "3": 6
+        }
+      }
+    },
+    "warnings": [
+      "breakout_up_eval table: low: n=19, mean=0.0005810263833609452, win=0.7894736842105263 | mid: n=18, mean=0.0001883219886858706, win=0.3888888888888889 | high: n=18, mean=0.00023956683997126233, win=0.6111111111111112"
+    ],
+    "errors": [
+      "breakout_strength_test: no significant high-vs-low strength difference (p=0.3234 >= 0.05)",
+      "breakout_strength_test: significant p but high strength mean return <= low strength mean return",
+      "breakout_up_eval: monotonic check failed on raw-breakout strength buckets (require high > mid > low on mean ret_4)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": 0.0002553901481288642,
+      "mean_fwd_price_up_oi_down": -1.0567346518045456e-05,
+      "n_price_up_oi_up": 114,
+      "n_price_up_oi_down": 345,
+      "pu_oiu_vs_oid_mannwhitney_p": 0.5289888954381896,
+      "basis_bucket_counts": {
+        "low": 324,
+        "mid": 324,
+        "high": 320
+      },
+      "basis_bucket_mean_fwd": {
+        "low": -8.828323749795622e-05,
+        "mid": 8.133823234994745e-05,
+        "high": 0.00022418841086244249
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: PU_OIU vs PU_OID not significantly different (p=0.5290)"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 39,
+      "early": {
+        "pnl_sum": 1.5999999999989996,
+        "winrate": 0.3157894736842105,
+        "sharpe_proxy": 0.04890063248789685
+      },
+      "late": {
+        "pnl_sum": -16.30000000000109,
+        "winrate": 0.2,
+        "sharpe_proxy": -0.4288122722615654
+      },
+      "mannwhitney_early_late_pnl_p": 0.11537181838673645
+    },
+    "warnings": [],
+    "errors": [
+      "adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "aggregate_mode": "multiday",
+    "reports_dir": "reports",
+    "cache_dir": "data\\cache",
+    "symbol": "VN30F1M",
+    "aggregate_start_date": "20260504",
+    "aggregate_end_date": "20260507",
+    "n_decisions": 972,
+    "n_bars_close": 972,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "total_n_breakout": 55,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260504_0723.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260505_0756.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260506_0749.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260507_0738.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260504_0723.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260505_0756.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260506_0749.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260507_0738.jsonl"
+    ],
+    "decision_files_count": 4,
+    "trade_files_count": 4,
+    "bar_offset_final": 972,
+    "close_source": "external_closes_file",
+    "close_missing_count": 0,
+    "close_missing_ratio": 0.0,
+    "zero_return_ratio": 0.04840370751802266,
+    "total_bars": 972,
+    "aggregate_closes_path": "reports\\closes_VN30F1M_20260504_20260507_merged.json",
+    "scoring_mode": "all"
+  },
+  "scoring_long": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "scoring_domain": "breakout_up_filtered_last",
+      "n_decision_rows": 972,
+      "n_rows_in_scoring_domain": 66,
+      "score_source": "v2.score_long",
+      "aligned_target": "forward_return",
+      "n_samples": 66,
+      "pearson_r": 0.0010304096791106977,
+      "pearson_p": 0.993448529053014,
+      "spearman_rho": -0.09408400133600536,
+      "spearman_p": 0.45240771148197567,
+      "bucket_mean_aligned_return": {
+        "low": 0.0002970851363854093,
+        "mid": -5.962108676685009e-05,
+        "high": 6.770971435519935e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0010, p=0.9934)",
+      "scoring_long: bucket mean aligned returns not monotonic low→mid→high: [0.0002970851363854093, -5.962108676685009e-05, 6.770971435519935e-05]"
+    ]
+  },
+  "scoring_short": {
+    "passed": false,
+    "metrics": {
+      "direction": "short",
+      "scoring_domain": "exhaustion_confirm",
+      "n_decision_rows": 972,
+      "n_rows_in_scoring_domain": 8,
+      "score_source": "features.short_score",
+      "aligned_target": "neg_forward_return",
+      "n_samples": 8,
+      "pearson_r": -0.47723228531925,
+      "pearson_p": 0.2317690924811105,
+      "spearman_rho": -0.5714285714285715,
+      "spearman_p": 0.1389599571607067,
+      "bucket_mean_aligned_return": {
+        "low": NaN,
+        "mid": NaN,
+        "high": -0.0004954209134576461
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_short: insufficient samples (8 < 20)"
+    ]
+  },
+  "scoring_combined": {
+    "passed": false,
+    "long_passed": false,
+    "short_passed": false
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "scoring_domain": "breakout_up_filtered_last",
+      "n_decision_rows": 972,
+      "n_rows_in_scoring_domain": 66,
+      "score_source": "v2.score_long",
+      "aligned_target": "forward_return",
+      "n_samples": 66,
+      "pearson_r": 0.0010304096791106977,
+      "pearson_p": 0.993448529053014,
+      "spearman_rho": -0.09408400133600536,
+      "spearman_p": 0.45240771148197567,
+      "bucket_mean_aligned_return": {
+        "low": 0.0002970851363854093,
+        "mid": -5.962108676685009e-05,
+        "high": 6.770971435519935e-05
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0010, p=0.9934)",
+      "scoring_long: bucket mean aligned returns not monotonic low→mid→high: [0.0002970851363854093, -5.962108676685009e-05, 6.770971435519935e-05]"
+    ]
+  }
+}

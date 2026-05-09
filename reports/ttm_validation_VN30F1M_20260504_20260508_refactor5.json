@@ -1,0 +1,938 @@
+{
+  "breakout": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "raw_breakout_source": "features",
+      "breakout_window": 20,
+      "n_breakout_bars": 66,
+      "n_non_breakout_bars": 993,
+      "n_raw_breakout_up_bars": 124,
+      "n_valid_breakout_up_bars": 66,
+      "raw_breakout_up_ratio": 0.06232294617563739,
+      "valid_breakout_up_ratio": 0.532258064516129,
+      "true_breakout_rate": 0.5725806451612904,
+      "trap_detection_rate": 0.18548387096774194,
+      "trap_threshold": 0.0005,
+      "total_adverse_breakouts": 23,
+      "detected_traps": 23,
+      "trap_candidates": 124,
+      "mannwhitney_strength_high_vs_low_p_value": 0.7513343125576336,
+      "mannwhitney_strength_high_vs_low_stat": 228.0,
+      "breakout_return_stats": {
+        "full_sample": {
+          "n": 66,
+          "mean_return": 0.0003431539670582586,
+          "winrate": 0.6212121212121212,
+          "top_20_return_mean": 0.0018264275687462912,
+          "bottom_20_return_mean": -0.0011501450326796738
+        },
+        "non_zero_sample": {
+          "n": 64,
+          "mean_return": 0.0003538775285288292,
+          "winrate": 0.640625,
+          "top_20_return_mean": 0.001873154532921185,
+          "bottom_20_return_mean": -0.0012090390389462844
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 1.0723561470570584e-05,
+          "non_zero_minus_full_winrate": 0.019412878787878785,
+          "non_zero_minus_full_top_20_return_mean": 4.672696417489376e-05,
+          "non_zero_minus_full_bottom_20_return_mean": -5.8894006266610585e-05,
+          "zero_return_count": 2
+        }
+      },
+      "non_breakout_return_stats": {
+        "full_sample": {
+          "n": 993,
+          "mean_return": 3.314317722645382e-05,
+          "winrate": 0.48942598187311176,
+          "top_20_return_mean": 0.0018142395783455586,
+          "bottom_20_return_mean": -0.001695606880003132
+        },
+        "non_zero_sample": {
+          "n": 965,
+          "mean_return": 3.4104844544941614e-05,
+          "winrate": 0.5036269430051813,
+          "top_20_return_mean": 0.0018427099809505882,
+          "bottom_20_return_mean": -0.0017225701498783815
+        },
+        "comparison": {
+          "non_zero_minus_full_mean_return": 9.616673184877943e-07,
+          "non_zero_minus_full_winrate": 0.014200961132069534,
+          "non_zero_minus_full_top_20_return_mean": 2.8470402605029668e-05,
+          "non_zero_minus_full_bottom_20_return_mean": -2.6963269875249392e-05,
+          "zero_return_count": 28
+        }
+      },
+      "breakout_up_eval": {
+        "n_is_breakout_up": 66,
+        "n_breakout_up": 66,
+        "ret_2_mean": 0.00038706800128910073,
+        "ret_3_mean": 0.0003281194382750229,
+        "ret_4_mean": 0.0003431539670582586,
+        "ret_4_winrate": 0.6212121212121212,
+        "ret_4_sharpe": 0.313540978290272,
+        "bucket_table": [
+          {
+            "bucket": "low",
+            "n": 22,
+            "mean_ret_4": 0.0003436772409861571,
+            "winrate_ret_4": 0.7272727272727273
+          },
+          {
+            "bucket": "mid",
+            "n": 22,
+            "mean_ret_4": 0.00036702927780407705,
+            "winrate_ret_4": 0.5
+          },
+          {
+            "bucket": "high",
+            "n": 22,
+            "mean_ret_4": 0.0003187553823845418,
+            "winrate_ret_4": 0.6363636363636364
+          }
+        ],
+        "monotonic_low_mid_high": false,
+        "strength_validation_mode": "strong_mannwhitney",
+        "mean_ret_4_high_minus_low": -2.492185860161533e-05,
+        "strength_axis": "raw_strength",
+        "mean_ret_low": 0.0003436772409861571,
+        "mean_ret_mid": 0.00036702927780407705,
+        "mean_ret_high": 0.0003187553823845418,
+        "mean_mid_ge_mean_high": true,
+        "anti_inverted_u_ok": true
+      },
+      "breakout_down_eval": {
+        "n_is_breakout_down": 0,
+        "ret_4_short_mean_return": null,
+        "ret_4_short_winrate": null,
+        "ret_4_short_sharpe": null,
+        "bucket_table": [],
+        "monotonic_low_mid_high": null
+      },
+      "v2_trade_holding": {
+        "n_v2_long_closed": 40,
+        "n_v2_closed_all_sides": 45,
+        "pct_holding_period_eq_1": 0.425,
+        "holding_period_hist": {
+          "2": 9,
+          "1": 17,
+          "4": 8,
+          "3": 6
+        }
+      }
+    },
+    "warnings": [
+      "breakout_up_eval table: low: n=22, mean=0.0003436772409861571, win=0.7272727272727273 | mid: n=22, mean=0.00036702927780407705, win=0.5 | high: n=22, mean=0.0003187553823845418, win=0.6363636363636364"
+    ],
+    "errors": [
+      "breakout_strength_test: no significant high-vs-low strength difference (p=0.7513 >= 0.05)",
+      "breakout_strength_test: significant p but high strength mean return <= low strength mean return",
+      "breakout_up_eval: monotonic check failed on raw-breakout strength buckets (require high > mid > low on mean ret_4)"
+    ]
+  },
+  "positioning": {
+    "passed": false,
+    "metrics": {
+      "forward_horizon_bars": 4,
+      "mean_fwd_price_up_oi_up": 0.00017910744766487416,
+      "mean_fwd_price_up_oi_down": 6.170061731459672e-06,
+      "n_price_up_oi_up": 131,
+      "n_price_up_oi_down": 371,
+      "pu_oiu_vs_oid_mannwhitney_p": 0.9427499269394041,
+      "basis_bucket_counts": {
+        "low": 355,
+        "mid": 350,
+        "high": 354
+      },
+      "basis_bucket_mean_fwd": {
+        "low": -6.35205339913823e-05,
+        "mid": 0.00010165409763512707,
+        "high": 0.00012014178589367213
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "positioning: PU_OIU vs PU_OID not significantly different (p=0.9427)"
+    ]
+  },
+  "adaptive": {
+    "passed": false,
+    "metrics": {
+      "n_closed_trades": 45,
+      "early": {
+        "pnl_sum": -0.10000000000104592,
+        "winrate": 0.2727272727272727,
+        "sharpe_proxy": -0.0028103972427648634
+      },
+      "late": {
+        "pnl_sum": -12.800000000000864,
+        "winrate": 0.30434782608695654,
+        "sharpe_proxy": -0.2808111637052013
+      },
+      "mannwhitney_early_late_pnl_p": 0.2419376286518764
+    },
+    "warnings": [
+      "adaptive: Mann-Whitney on early vs late PnL p=0.242 (no strong shift)"
+    ],
+    "errors": [
+      "adaptive: late segment not better than early on winrate/sharpe_proxy/pnl_sum"
+    ]
+  },
+  "overall_valid": false,
+  "global_warnings": [],
+  "meta": {
+    "aggregate_mode": "multiday",
+    "reports_dir": "reports",
+    "cache_dir": "data\\cache",
+    "symbol": "VN30F1M",
+    "aggregate_start_date": "20260504",
+    "aggregate_end_date": "20260508",
+    "n_decisions": 1063,
+    "n_bars_close": 1063,
+    "forward_horizon": 4,
+    "alpha": 0.05,
+    "breakout_window": 20,
+    "scipy_available": true,
+    "total_n_breakout": 66,
+    "decision_files": [
+      "reports\\ttm_parallel_decisions_VN30F1M_20260504_0723.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260505_0756.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260506_0749.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260507_0738.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260508_0708.jsonl",
+      "reports\\ttm_parallel_decisions_VN30F1M_20260508_1300.jsonl"
+    ],
+    "trade_files": [
+      "reports\\ttm_parallel_trades_VN30F1M_20260504_0723.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260505_0756.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260506_0749.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260507_0738.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260508_0708.jsonl",
+      "reports\\ttm_parallel_trades_VN30F1M_20260508_1300.jsonl"
+    ],
+    "decision_files_count": 6,
+    "trade_files_count": 6,
+    "bar_offset_final": 1063,
+    "close_source": "external_closes_file",
+    "close_missing_count": 0,
+    "close_missing_ratio": 0.0,
+    "zero_return_ratio": 0.04990583804143126,
+    "total_bars": 1063,
+    "aggregate_closes_path": "reports\\closes_VN30F1M_20260504_20260508_merged.json",
+    "scoring_mode": "all"
+  },
+  "scoring_long": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "scoring_domain": "breakout_up_filtered_last",
+      "n_decision_rows": 1063,
+      "n_rows_in_scoring_domain": 79,
+      "score_source": "v2.score_long",
+      "aligned_target": "forward_return",
+      "n_samples": 78,
+      "pearson_r": 0.04152821020703891,
+      "pearson_p": 0.7180983061297612,
+      "spearman_rho": -0.03040094086653438,
+      "spearman_p": 0.791610368611375,
+      "bucket_mean_aligned_return": {
+        "low": 6.38605703987234e-05,
+        "mid": 0.0001853107330181586,
+        "high": 0.00016115496187659936
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0415, p=0.7181)",
+      "scoring_long: bucket mean aligned returns not monotonic low→mid→high: [6.38605703987234e-05, 0.0001853107330181586, 0.00016115496187659936]"
+    ]
+  },
+  "scoring_short": {
+    "passed": false,
+    "metrics": {
+      "direction": "short",
+      "scoring_domain": "exhaustion_confirm",
+      "n_decision_rows": 1063,
+      "n_rows_in_scoring_domain": 8,
+      "score_source": "features.short_score",
+      "aligned_target": "neg_forward_return",
+      "n_samples": 8,
+      "pearson_r": -0.47723228531925,
+      "pearson_p": 0.2317690924811105,
+      "spearman_rho": -0.5714285714285715,
+      "spearman_p": 0.1389599571607067,
+      "bucket_mean_aligned_return": {
+        "low": NaN,
+        "mid": NaN,
+        "high": -0.0004954209134576461
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_short: insufficient samples (8 < 20)"
+    ]
+  },
+  "scoring_combined": {
+    "passed": false,
+    "long_passed": false,
+    "short_passed": false
+  },
+  "scoring": {
+    "passed": false,
+    "metrics": {
+      "direction": "long",
+      "scoring_domain": "breakout_up_filtered_last",
+      "n_decision_rows": 1063,
+      "n_rows_in_scoring_domain": 79,
+      "score_source": "v2.score_long",
+      "aligned_target": "forward_return",
+      "n_samples": 78,
+      "pearson_r": 0.04152821020703891,
+      "pearson_p": 0.7180983061297612,
+      "spearman_rho": -0.03040094086653438,
+      "spearman_p": 0.791610368611375,
+      "bucket_mean_aligned_return": {
+        "low": 6.38605703987234e-05,
+        "mid": 0.0001853107330181586,
+        "high": 0.00016115496187659936
+      }
+    },
+    "warnings": [],
+    "errors": [
+      "scoring_long: Pearson correlation not significant (r=0.0415, p=0.7181)",
+      "scoring_long: bucket mean aligned returns not monotonic low→mid→high: [6.38605703987234e-05, 0.0001853107330181586, 0.00016115496187659936]"
+    ]
+  },
+  "refactor5_report": {
+    "dataset_summary": {
+      "n_decisions": 1063,
+      "n_trades": 45,
+      "n_long_trades": 40,
+      "n_short_trades": 5,
+      "date_start": "20260504",
+      "date_end": "20260508",
+      "partial_sessions": [
+        "20260504_0723",
+        "20260505_0756",
+        "20260506_0749",
+        "20260507_0738",
+        "20260508_0708",
+        "20260508_1300"
+      ],
+      "close_missing_count": 0,
+      "close_missing_ratio": 0.0,
+      "partial_session_note": "20260508 likely partial if end-time < 14:38"
+    },
+    "breakout_detector_health": {
+      "n_valid_breakout": 124,
+      "breakout_mean_forward_return": 0.0002793340615942901,
+      "non_breakout_mean_forward_return": 2.2376377726226454e-05,
+      "breakout_winrate": 0.5725806451612904,
+      "non_breakout_winrate": 0.48770053475935826,
+      "true_breakout_rate": null,
+      "trap_adverse_count": null,
+      "interpretation": {
+        "raw_strength": "detector existence/force axis",
+        "score_long_effective_strength": "ranking expected return axis"
+      }
+    },
+    "long_scoring_validation": {
+      "score_long": {
+        "n_samples": 78,
+        "pearson_r": 0.04152821020703891,
+        "spearman_rho": -0.03040094086653438,
+        "bucket_low_mid_high": [
+          {
+            "bucket": "low",
+            "n": 26,
+            "mean_forward_return": 6.38605703987234e-05,
+            "winrate": 0.6538461538461539
+          },
+          {
+            "bucket": "mid",
+            "n": 26,
+            "mean_forward_return": 0.0001853107330181586,
+            "winrate": 0.46153846153846156
+          },
+          {
+            "bucket": "high",
+            "n": 26,
+            "mean_forward_return": 0.00016115496187659936,
+            "winrate": 0.5384615384615384
+          }
+        ],
+        "top20_minus_bottom20": -0.00021005611922938664,
+        "top_count": 16,
+        "bottom_count": 16,
+        "insufficient_sample": false
+      },
+      "effective_strength": {
+        "n_samples": 78,
+        "pearson_r": 0.054258361842794235,
+        "spearman_rho": -0.03040094086653438,
+        "bucket_low_mid_high": [
+          {
+            "bucket": "low",
+            "n": 26,
+            "mean_forward_return": 6.38605703987234e-05,
+            "winrate": 0.6538461538461539
+          },
+          {
+            "bucket": "mid",
+            "n": 26,
+            "mean_forward_return": 0.0001853107330181586,
+            "winrate": 0.46153846153846156
+          },
+          {
+            "bucket": "high",
+            "n": 26,
+            "mean_forward_return": 0.00016115496187659936,
+            "winrate": 0.5384615384615384
+          }
+        ],
+        "top20_minus_bottom20": -0.00021005611922938664,
+        "top_count": 16,
+        "bottom_count": 16,
+        "insufficient_sample": false
+      },
+      "raw_strength_diagnostic": {
+        "n_samples": 78,
+        "pearson_r": 0.06311609173061813,
+        "spearman_rho": -0.01172282536741987,
+        "bucket_low_mid_high": [
+          {
+            "bucket": "low",
+            "n": 26,
+            "mean_forward_return": 0.000160893061089991,
+            "winrate": 0.6538461538461539
+          },
+          {
+            "bucket": "mid",
+            "n": 26,
+            "mean_forward_return": -3.563886057931187e-05,
+            "winrate": 0.4230769230769231
+          },
+          {
+            "bucket": "high",
+            "n": 26,
+            "mean_forward_return": 0.00028507206478280204,
+            "winrate": 0.5769230769230769
+          }
+        ],
+        "top20_minus_bottom20": 0.00013924472399900448,
+        "top_count": 16,
+        "bottom_count": 16,
+        "insufficient_sample": false
+      },
+      "acceptance_hint": "Prefer high > low; monotonic target only when sample sufficient"
+    },
+    "last_bar_return_impact": {
+      "bucket_last_bar_return_raw": {
+        "n_samples": 75,
+        "pearson_r": -0.18750608159465926,
+        "spearman_rho": -0.15110001524676858,
+        "bucket_low_mid_high": [
+          {
+            "bucket": "low",
+            "n": 25,
+            "mean_forward_return": 0.00011689082528267232,
+            "winrate": 0.56
+          },
+          {
+            "bucket": "mid",
+            "n": 25,
+            "mean_forward_return": 0.0004835502249525447,
+            "winrate": 0.72
+          },
+          {
+            "bucket": "high",
+            "n": 25,
+            "mean_forward_return": -0.00029649005792385273,
+            "winrate": 0.36
+          }
+        ],
+        "top20_minus_bottom20": -0.0004994519794771947,
+        "top_count": 15,
+        "bottom_count": 15,
+        "insufficient_sample": false
+      },
+      "bucket_positive_last_bar_return": {
+        "n_samples": 78,
+        "pearson_r": null,
+        "spearman_rho": null,
+        "bucket_low_mid_high": [
+          {
+            "bucket": "low",
+            "n": 78,
+            "mean_forward_return": 0.00013677542176449375,
+            "winrate": 0.5512820512820513
+          },
+          {
+            "bucket": "mid",
+            "n": 0,
+            "mean_forward_return": null,
+            "winrate": null
+          },
+          {
+            "bucket": "high",
+            "n": 0,
+            "mean_forward_return": null,
+            "winrate": null
+          }
+        ],
+        "top20_minus_bottom20": 0.0,
+        "top_count": 78,
+        "bottom_count": 78,
+        "insufficient_sample": false
+      },
+      "spike_threshold_candidate": 0.0,
+      "spike_count": 78,
+      "non_spike_count": 0,
+      "spike_mean_forward_return": 0.00013677542176449375,
+      "non_spike_mean_forward_return": null,
+      "question_answer": {
+        "spike_worse_trade_quality": null,
+        "blocked_by_spike_filter": 78
+      }
+    },
+    "crowd_phase_performance": [
+      {
+        "phase": "no_breakout",
+        "decision_count": 1063,
+        "trade_count": 45,
+        "forward_return_mean": 5.246396299500823e-05,
+        "winrate": 0.28888888888888886,
+        "realized_pnl_sum": -0.006190690381686207,
+        "avg_holding": 2.088888888888889,
+        "mfe_mean": null,
+        "mae_mean": null
+      },
+      {
+        "phase": "ignition",
+        "decision_count": 0,
+        "trade_count": 0,
+        "forward_return_mean": null,
+        "winrate": null,
+        "realized_pnl_sum": null,
+        "avg_holding": null,
+        "mfe_mean": null,
+        "mae_mean": null
+      },
+      {
+        "phase": "early_continuation",
+        "decision_count": 0,
+        "trade_count": 0,
+        "forward_return_mean": null,
+        "winrate": null,
+        "realized_pnl_sum": null,
+        "avg_holding": null,
+        "mfe_mean": null,
+        "mae_mean": null
+      },
+      {
+        "phase": "late_fomo",
+        "decision_count": 0,
+        "trade_count": 0,
+        "forward_return_mean": null,
+        "winrate": null,
+        "realized_pnl_sum": null,
+        "avg_holding": null,
+        "mfe_mean": null,
+        "mae_mean": null
+      },
+      {
+        "phase": "exhaustion",
+        "decision_count": 0,
+        "trade_count": 0,
+        "forward_return_mean": null,
+        "winrate": null,
+        "realized_pnl_sum": null,
+        "avg_holding": null,
+        "mfe_mean": null,
+        "mae_mean": null
+      },
+      {
+        "phase": "failed_breakout",
+        "decision_count": 0,
+        "trade_count": 0,
+        "forward_return_mean": null,
+        "winrate": null,
+        "realized_pnl_sum": null,
+        "avg_holding": null,
+        "mfe_mean": null,
+        "mae_mean": null
+      }
+    ],
+    "entry_block_simulation": [
+      {
+        "reason": "late_fomo",
+        "mode": "simulation",
+        "blocked_trades": 0,
+        "blocked_pnl": 0.0,
+        "kept_pnl": -0.00071408193864521,
+        "blocked_winrate": null,
+        "kept_winrate": 0.325,
+        "blocked_avg_trade": null,
+        "kept_avg_trade": -1.785204846613025e-05
+      },
+      {
+        "reason": "exhaustion",
+        "mode": "simulation",
+        "blocked_trades": 0,
+        "blocked_pnl": 0.0,
+        "kept_pnl": -0.00071408193864521,
+        "blocked_winrate": null,
+        "kept_winrate": 0.325,
+        "blocked_avg_trade": null,
+        "kept_avg_trade": -1.785204846613025e-05
+      },
+      {
+        "reason": "last_bar_return_spike",
+        "mode": "simulation",
+        "blocked_trades": 40,
+        "blocked_pnl": -0.00071408193864521,
+        "kept_pnl": 0.0,
+        "blocked_winrate": 0.325,
+        "kept_winrate": null,
+        "blocked_avg_trade": -1.785204846613025e-05,
+        "kept_avg_trade": null
+      },
+      {
+        "reason": "score_below_threshold",
+        "mode": "simulation",
+        "blocked_trades": 15,
+        "blocked_pnl": 0.0009252980053246936,
+        "kept_pnl": -0.0016393799439699027,
+        "blocked_winrate": 0.4,
+        "kept_winrate": 0.28,
+        "blocked_avg_trade": 6.168653368831291e-05,
+        "kept_avg_trade": -6.557519775879611e-05
+      },
+      {
+        "reason": "failed_breakout",
+        "mode": "simulation",
+        "blocked_trades": 0,
+        "blocked_pnl": 0.0,
+        "kept_pnl": -0.00071408193864521,
+        "blocked_winrate": null,
+        "kept_winrate": 0.325,
+        "blocked_avg_trade": null,
+        "kept_avg_trade": -1.785204846613025e-05
+      }
+    ],
+    "holding_period_performance": {
+      "rows": [
+        {
+          "bucket": "1",
+          "trade_count": 20,
+          "pnl_sum": -0.007872076265040405,
+          "winrate": 0.05,
+          "avg_trade": -0.00039360381325202027
+        },
+        {
+          "bucket": "2",
+          "trade_count": 9,
+          "pnl_sum": -0.004311247296658296,
+          "winrate": 0.1111111111111111,
+          "avg_trade": -0.00047902747740647734
+        },
+        {
+          "bucket": "3+",
+          "trade_count": 16,
+          "pnl_sum": 0.005992633180012493,
+          "winrate": 0.6875,
+          "avg_trade": 0.0003745395737507808
+        },
+        {
+          "bucket": "4+",
+          "trade_count": 8,
+          "pnl_sum": 0.006244047410761264,
+          "winrate": 0.875,
+          "avg_trade": 0.000780505926345158
+        }
+      ],
+      "soft_min_hold_prevented_exits": 0
+    },
+    "exit_reason_performance": {
+      "long": [
+        {
+          "exit_reason": "unknown",
+          "count": 40,
+          "pnl": -0.0007140819386452085,
+          "winrate": 0.325,
+          "avg_trade": -1.7852048466130212e-05,
+          "avg_holding": 2.125,
+          "mfe_mean": null,
+          "mae_mean": null
+        }
+      ],
+      "short": [
+        {
+          "exit_reason": "unknown",
+          "count": 5,
+          "pnl": -0.005476608443040997,
+          "winrate": 0.0,
+          "avg_trade": -0.0010953216886081993,
+          "avg_holding": 1.8,
+          "mfe_mean": null,
+          "mae_mean": null
+        }
+      ]
+    },
+    "short_validation": {
+      "actual_short": {
+        "count": 5,
+        "pnl": -0.005476608443040997,
+        "winrate": 0.0,
+        "avg_trade": -0.0010953216886081993,
+        "avg_holding": 1.8,
+        "entry_short_phase_distribution": {
+          "unknown": 5
+        },
+        "exit_reason_distribution": {
+          "unknown": 5
+        }
+      },
+      "short_candidates": [
+        {
+          "phase": "no_short_context",
+          "count": 8,
+          "E_neg_forward_return": -0.0004954209134576461,
+          "short_winrate": 0.375,
+          "top_minus_bottom": -0.0012339744437457041
+        },
+        {
+          "phase": "crowded_long_watch",
+          "count": 0,
+          "E_neg_forward_return": null,
+          "short_winrate": null,
+          "top_minus_bottom": null
+        },
+        {
+          "phase": "short_setup",
+          "count": 0,
+          "E_neg_forward_return": null,
+          "short_winrate": null,
+          "top_minus_bottom": null
+        },
+        {
+          "phase": "short_trigger",
+          "count": 0,
+          "E_neg_forward_return": null,
+          "short_winrate": null,
+          "top_minus_bottom": null
+        },
+        {
+          "phase": "short_chase_risk",
+          "count": 0,
+          "E_neg_forward_return": null,
+          "short_winrate": null,
+          "top_minus_bottom": null
+        },
+        {
+          "phase": "short_invalid",
+          "count": 0,
+          "E_neg_forward_return": null,
+          "short_winrate": null,
+          "top_minus_bottom": null
+        }
+      ],
+      "short_alpha_checks": {
+        "short_trigger_outperform_setup_watch": null,
+        "short_chase_risk_worse_than_trigger": null,
+        "blocked_early_continuation_not_good_short": null,
+        "no_prior_breakout_not_trusted": null
+      },
+      "acceptance_note": "Do not force positive SHORT pnl on small sample; require phase separation/logging."
+    },
+    "before_after": {
+      "baseline_path": "reports\\ttm_validation_VN30F1M_20260504_20260507.json",
+      "before": {
+        "total_trades": 39.0,
+        "LONG_trades": 34.0,
+        "LONG_pnl": null,
+        "LONG_winrate": null,
+        "SHORT_trades": null,
+        "SHORT_pnl": null,
+        "SHORT_winrate": null,
+        "avg_trade": null,
+        "score_long_top_vs_bottom": -0.00022937542203020996,
+        "effective_strength_top_vs_bottom": null,
+        "last_bar_return_spike_blocked_count": null,
+        "holding_1_bar_count": 16,
+        "holding_3_plus_count": 11,
+        "holding_1_bar_pnl": null,
+        "holding_3_plus_pnl": null,
+        "exit_reason_distribution": null,
+        "_legacy_meta_start": "20260504",
+        "_legacy_meta_end": "20260507"
+      },
+      "after": {
+        "total_trades": 45,
+        "LONG_trades": 40,
+        "LONG_pnl": -0.0007140819386452085,
+        "LONG_winrate": 0.325,
+        "SHORT_trades": 5,
+        "SHORT_pnl": -0.005476608443040997,
+        "SHORT_winrate": 0.0,
+        "avg_trade": -0.00013757089737080462,
+        "score_long_top_vs_bottom": -0.00021005611922938664,
+        "effective_strength_top_vs_bottom": -0.00021005611922938664,
+        "last_bar_return_spike_blocked_count": 78,
+        "holding_1_bar_count": 20,
+        "holding_1_bar_pnl": -0.007872076265040405,
+        "holding_3_plus_count": 16,
+        "holding_3_plus_pnl": 0.005992633180012493,
+        "exit_reason_distribution": {
+          "unknown": 45
+        }
+      },
+      "rows": [
+        {
+          "metric": "total_trades",
+          "before": 39.0,
+          "after": 45,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "LONG_trades",
+          "before": 34.0,
+          "after": 40,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "LONG_pnl",
+          "before": null,
+          "after": -0.0007140819386452085,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "LONG_winrate",
+          "before": null,
+          "after": 0.325,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "SHORT_trades",
+          "before": null,
+          "after": 5,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "SHORT_pnl",
+          "before": null,
+          "after": -0.005476608443040997,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "SHORT_winrate",
+          "before": null,
+          "after": 0.0,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "avg_trade",
+          "before": null,
+          "after": -0.00013757089737080462,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "score_long_top_vs_bottom",
+          "before": -0.00022937542203020996,
+          "after": -0.00021005611922938664,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "effective_strength_top_vs_bottom",
+          "before": null,
+          "after": -0.00021005611922938664,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "last_bar_return_spike_blocked_count",
+          "before": null,
+          "after": 78,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "holding_1_bar_count",
+          "before": 16,
+          "after": 20,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "holding_1_bar_pnl",
+          "before": null,
+          "after": -0.007872076265040405,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "holding_3_plus_count",
+          "before": 11,
+          "after": 16,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "holding_3_plus_pnl",
+          "before": null,
+          "after": 0.005992633180012493,
+          "comment": "baseline optional"
+        },
+        {
+          "metric": "exit_reason_distribution",
+          "before": null,
+          "after": {
+            "unknown": 45
+          },
+          "comment": "baseline optional"
+        }
+      ]
+    },
+    "acceptance": {
+      "logging": {
+        "every_decision_has_v2_score_components": true,
+        "every_decision_has_v2_short_components": true,
+        "every_trade_has_entry_exit_phase_if_available": true,
+        "every_trade_has_exit_reason": true,
+        "decision_score_components_coverage": 0.0,
+        "decision_short_components_coverage": 0.0
+      },
+      "exit": {
+        "holding_period_stats_reported": true,
+        "exit_reason_stats_reported": true
+      },
+      "no_leakage": {
+        "signal_bar_equals_entry_minus_1": true,
+        "simulations_marked": true
+      },
+      "overall_acceptance": true
+    },
+    "insufficient_sample_warnings": [
+      "legacy decision logs without v2 score_components/short_components; acceptance uses backward-compat mode",
+      "actual SHORT trades < 20; collect 50-100 candidates/trades before tuning"
+    ],
+    "pm_todo": [
+      "Review score_long high-vs-low and effective_strength high-vs-low",
+      "Review blocked late/FOMO and spike-filter blocked PnL",
+      "Review soft-min-hold saved trades vs increased losses",
+      "Review short_trigger quality; collect more SHORT samples before go-live"
+    ],
+    "cursor_output_sections": [
+      "files_changed",
+      "validation_command",
+      "dataset_coverage",
+      "before_after_table",
+      "long_scoring_table",
+      "last_bar_return_spike_table",
+      "crowd_phase_table",
+      "holding_period_table",
+      "exit_reason_table",
+      "short_actual_candidate_table",
+      "insufficient_sample_warnings",
+      "risks_todo"
+    ]
+  },
+  "overall_acceptance_valid": true
+}

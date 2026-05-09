@@ -35,8 +35,14 @@ from src.strategies.ttm.ttm_regime import detect_regime
 from src.strategies.ttm.ttm_signal import generate_ttm_signal_v1
 from src.strategies.ttm.empirical.adaptive_engine import EmpiricalAlphaEngine
 from src.strategies.ttm.ttm_signal_v2 import generate_ttm_signal_v2
+from src.strategies.ttm.ttm_v2_exit_continuation import map_parallel_runner_reason_to_canonical
 from src.strategies.ttm.ttm_strategy import TTMDerivativesStrategy
-from src.strategies.ttm.ttm_v2_short import build_exhaustion_short_entry_meta, check_exhaustion_short_exit
+from src.strategies.ttm.ttm_v2_short import (
+    build_exhaustion_short_entry_meta,
+    build_short_opportunity_entry_meta,
+    check_exhaustion_short_exit,
+    check_short_v3_structural_exit,
+)
 from src.strategies.ttm.ttm_execution_realism import (
     ExecutionRealismConfig,
     adjust_fill_price,
@@ -75,6 +81,30 @@ def _v2_long_entry_calibration_from_features(feat: Mapping[str, Any]) -> Optiona
         "effective_strength": _json_safe(feat.get("effective_strength")),
         "last_bar_return": _json_safe(feat.get("last_bar_return")),
     }
+
+
+def _build_v2_entry_snapshot(
+    sig_v2: Mapping[str, Any],
+    side: str,
+    config: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Persist score/phase/continuation at entry for CLOSED trade flattening (refactor_4)."""
+    dbg = dict(sig_v2.get("debug") or {})
+    sc = dbg.get("v2_score_components") if isinstance(dbg.get("v2_score_components"), dict) else {}
+    sh = dbg.get("v2_short_components") if isinstance(dbg.get("v2_short_components"), dict) else {}
+    _ = str(side).upper()
+    snap = {
+        "entry_score_long": dbg.get("score_long"),
+        "entry_crowd_phase": dbg.get("crowd_phase") or sc.get("crowd_phase"),
+        "continuation_score_at_entry": sc.get("continuation_confirm"),
+        "short_entry_phase": sh.get("short_phase") or dbg.get("short_phase"),
+        "short_entry_score": sh.get("short_score"),
+        "short_entry_reason": sh.get("short_reason"),
+        "entry_prob_long": dbg.get("prob_long"),
+        "entry_prob_short": dbg.get("prob_short"),
+        "target_alpha_hold_bars": int(config.get("ttm_v2_target_alpha_hold_bars", 3)),
+    }
+    return {k: _json_safe(v) for k, v in snap.items()}
 
 
 def _snapshot_feature_value(last: Mapping[str, Any], key: str) -> Any:
@@ -139,6 +169,98 @@ def _classify_v2_blocked(
     if rid is not None and "regime" in r:
         return "regime"
     return "none"
+
+
+# Placeholders for crowd-alpha breakdown (commit 1: all None; populated in later commits).
+_V2_SCORE_COMPONENTS_EMPTY: Dict[str, Any] = {
+    "breakout_conviction": None,
+    "continuation_confirm": None,
+    "basis_confirm": None,
+    "extension": None,
+    "extension_sq": None,
+    "last_bar_return_raw": None,
+    "last_bar_return_norm": None,
+    "positive_last_bar_return": None,
+    "late_phase_penalty": None,
+    "effective_strength_raw": None,
+    "effective_strength": None,
+    "score_long": None,
+    "crowd_phase": None,
+    "late_fomo_flag": None,
+    "entry_block_reason": None,
+}
+
+_V2_SHORT_COMPONENTS_EMPTY: Dict[str, Any] = {
+    "prior_upside_breakout_exists": None,
+    "last_upside_breakout_bar_index": None,
+    "bars_since_upside_breakout": None,
+    "crowded_long_pressure": None,
+    "continuation_decay": None,
+    "rejection_confirm": None,
+    "failed_breakout_confirm": None,
+    "downside_momentum_confirm": None,
+    "early_continuation_still_alive": None,
+    "short_chase_risk": None,
+    "short_effective_strength_raw": None,
+    "short_effective_strength": None,
+    "short_score": None,
+    "short_phase": None,
+    "short_candidate": None,
+    "short_block_reason": None,
+    "short_reason": None,
+}
+
+def _merge_v2_score_components_log(dbg: Mapping[str, Any]) -> Dict[str, Any]:
+    sc = {k: _json_safe(v) for k, v in _V2_SCORE_COMPONENTS_EMPTY.items()}
+    packed = dbg.get("v2_score_components")
+    if isinstance(packed, dict):
+        for k in sc:
+            if k in packed:
+                sc[k] = _json_safe(packed[k])
+    return sc
+
+
+def _merge_v2_short_components_log(dbg: Mapping[str, Any]) -> Dict[str, Any]:
+    sc = {k: _json_safe(v) for k, v in _V2_SHORT_COMPONENTS_EMPTY.items()}
+    packed = dbg.get("v2_short_components")
+    if isinstance(packed, dict):
+        for k in sc:
+            if k in packed:
+                sc[k] = _json_safe(packed[k])
+    return sc
+
+
+# Flat CLOSED trade row extensions for V2 (refactor_1 foundation).
+_V2_CLOSED_TRADE_FLAT_DEFAULTS: Dict[str, Any] = {
+    "signal_bar_index": None,
+    "signal_score_long": None,
+    "entry_confirm_score_long": None,
+    "entry_crowd_phase": None,
+    "exit_crowd_phase": None,
+    "entry_blocked": None,
+    "entry_block_reason": None,
+    "exit_reason": None,
+    "holding_bars": None,
+    "entry_score_long": None,
+    "exit_score_long": None,
+    "continuation_score_at_entry": None,
+    "continuation_score_at_exit": None,
+    "mfe": None,
+    "mae": None,
+    "bars_to_mfe": None,
+    "short_entry_phase": None,
+    "short_exit_phase": None,
+    "short_entry_score": None,
+    "short_exit_score": None,
+    "short_entry_reason": None,
+    "short_exit_reason": None,
+    "prior_upside_breakout_bar": None,
+    "bars_since_upside_breakout_at_entry": None,
+    "crowded_long_pressure_at_entry": None,
+    "continuation_decay_at_entry": None,
+    "rejection_confirm_at_entry": None,
+    "short_chase_risk_at_entry": None,
+}
 
 
 def _build_v1_block(
@@ -228,11 +350,15 @@ def _build_v2_block(
             "oi": 0.0,
         },
         "blocked_by": blocked_by,
+        "score_components": _merge_v2_score_components_log(dbg),
+        "short_components": _merge_v2_short_components_log(dbg),
         "log": {
             "decision_source": dbg.get("decision_source", "threshold"),
             "threshold": _json_safe(dbg.get("entry_threshold", entry_thr)),
             "input_aligned_fingerprint": dbg.get("input_aligned_fingerprint"),
             "ttm_config_profile": dbg.get("ttm_config_profile"),
+            "crowd_phase": dbg.get("crowd_phase"),
+            "short_phase": dbg.get("short_phase"),
         },
     }
 
@@ -371,6 +497,11 @@ class ParallelPosition:
     entry_time: str = ""
     paper_exec_meta: Optional[Dict[str, Any]] = None
     entry_calibration: Optional[Dict[str, Any]] = None
+    entry_v2_meta: Optional[Dict[str, Any]] = None
+    mfe_return: float = 0.0
+    mae_return: float = 0.0
+    bars_to_mfe: int = -1
+    v2_extrema_initialized: bool = False
 
     def assert_consistent(self) -> None:
         if self.is_open:
@@ -397,6 +528,7 @@ class ParallelPosition:
         *,
         paper_exec_meta: Optional[Dict[str, Any]] = None,
         entry_calibration: Optional[Dict[str, Any]] = None,
+        entry_v2_meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         assert not self.is_open
         su = str(side).strip().upper()
@@ -410,6 +542,11 @@ class ParallelPosition:
         self.entry_time = str(entry_time or "")
         self.paper_exec_meta = dict(paper_exec_meta) if paper_exec_meta else None
         self.entry_calibration = dict(entry_calibration) if entry_calibration else None
+        self.entry_v2_meta = dict(entry_v2_meta) if entry_v2_meta else None
+        self.mfe_return = 0.0
+        self.mae_return = 0.0
+        self.bars_to_mfe = -1
+        self.v2_extrema_initialized = False
         self.assert_consistent()
 
     def close_position(self) -> None:
@@ -423,6 +560,11 @@ class ParallelPosition:
         self.entry_time = ""
         self.paper_exec_meta = None
         self.entry_calibration = None
+        self.entry_v2_meta = None
+        self.mfe_return = 0.0
+        self.mae_return = 0.0
+        self.bars_to_mfe = -1
+        self.v2_extrema_initialized = False
         self.assert_consistent()
 
 
@@ -492,6 +634,7 @@ class ParallelRunner:
     # Per-bar close aligned to decision JSONL ``bar_index`` (for ttm_validation --closes).
     _session_closes: List[float] = field(default_factory=list, init=False)
     _last_bars: List[Any] = field(default_factory=list, init=False)
+    _last_feat_row: Optional[Dict[str, Any]] = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.decision_log_path:
@@ -628,6 +771,71 @@ class ParallelRunner:
         last = features_last_row(feats) if int(feats.get("n", 0)) > 0 else {}
         return feats, last
 
+    def _update_v2_extrema(self, pos: ParallelPosition, price_ref: float) -> None:
+        if not pos.is_open or price_ref <= 0:
+            return
+        ep = float(pos.entry_price)
+        if ep <= 1e-12:
+            return
+        if pos.side == "LONG":
+            u = (float(price_ref) - ep) / ep
+        elif pos.side == "SHORT":
+            u = (ep - float(price_ref)) / ep
+        else:
+            return
+        if not pos.v2_extrema_initialized:
+            pos.mfe_return = float(u)
+            pos.mae_return = float(u)
+            pos.bars_to_mfe = int(pos.holding_bars)
+            pos.v2_extrema_initialized = True
+            return
+        if u > pos.mfe_return:
+            pos.mfe_return = float(u)
+            pos.bars_to_mfe = int(pos.holding_bars)
+        if u < pos.mae_return:
+            pos.mae_return = float(u)
+
+    def _build_v2_closed_flat(
+        self,
+        pos: ParallelPosition,
+        sig_v2: Mapping[str, Any],
+        side: str,
+    ) -> Dict[str, Any]:
+        dbg = dict(sig_v2.get("debug") or {})
+        ent = dict(pos.entry_v2_meta or {})
+        v2sc = dbg.get("v2_score_components") if isinstance(dbg.get("v2_score_components"), dict) else {}
+        v2sh = dbg.get("v2_short_components") if isinstance(dbg.get("v2_short_components"), dict) else {}
+        raw_reason = str(sig_v2.get("reason") or "")
+        ch = str(dbg.get("exit_channel") or "")
+        if dbg.get("parallel_runner_override"):
+            canon = map_parallel_runner_reason_to_canonical(side, raw_reason, ch)
+        elif ch == "continuation":
+            canon = raw_reason if raw_reason else "unknown"
+        elif ch == "prob":
+            canon = "score_decay" if str(side).upper() == "LONG" else "short_downside_decay"
+        else:
+            canon = map_parallel_runner_reason_to_canonical(side, raw_reason, ch)
+        exit_crowd = v2sc.get("crowd_phase") or dbg.get("crowd_phase")
+        return {
+            "signal_score_long": dbg.get("score_long"),
+            "exit_reason": canon,
+            "entry_crowd_phase": ent.get("entry_crowd_phase"),
+            "exit_crowd_phase": exit_crowd,
+            "entry_score_long": ent.get("entry_score_long"),
+            "exit_score_long": dbg.get("score_long"),
+            "continuation_score_at_entry": ent.get("continuation_score_at_entry"),
+            "continuation_score_at_exit": v2sc.get("continuation_confirm"),
+            "short_entry_phase": ent.get("short_entry_phase"),
+            "short_exit_phase": v2sh.get("short_phase") or dbg.get("short_phase"),
+            "short_entry_score": ent.get("short_entry_score"),
+            "short_exit_score": v2sh.get("short_score"),
+            "short_entry_reason": ent.get("short_entry_reason"),
+            "short_exit_reason": v2sh.get("short_reason"),
+            "mfe": float(pos.mfe_return),
+            "mae": float(pos.mae_return),
+            "bars_to_mfe": int(pos.bars_to_mfe) if pos.bars_to_mfe >= 0 else None,
+        }
+
     def on_new_bar(
         self,
         bar_index: int,
@@ -708,28 +916,11 @@ class ParallelRunner:
         pos_v2 = self._positions["v2"]
         side_v1 = pos_v1.effective_position_side()
         side_v2 = pos_v2.effective_position_side()
+        self._last_feat_row = dict(last) if last else {}
+        self._update_v2_extrema(pos_v2, price_ref)
 
-        sig_v1 = generate_ttm_signal_v1(
-            feats, self.config, position_side=side_v1, live_mode=False
-        )
-        _ts_int: Optional[int] = None
-        try:
-            _ts_int = int(timestamp) if str(timestamp).isdigit() else None
-        except (TypeError, ValueError):
-            _ts_int = None
-        sig_v2 = generate_ttm_signal_v2(
-            feats,
-            self.config,
-            position_side=side_v2,
-            live_mode=False,
-            adaptive=self.adaptive_context,
-            empirical_engine=self.empirical_engine,
-            bar_timestamp=_ts_int,
-        )
-
-        _dbg2_pre = sig_v2.get("debug") or {}
-        _pl0 = _dbg2_pre.get("prob_long")
-        _ps0 = _dbg2_pre.get("prob_short")
+        _holding_v2 = int(pos_v2.holding_bars) if pos_v2.is_open else None
+        _u_ret_for_sig: Optional[float] = None
         _maxb_long = int(self.config.get("ttm_v2_time_stop_bars", 4))
         _sl_ret_long = float(self.config.get("ttm_v2_sl_return", -0.0007))
         _tp_ret_long = float(self.config.get("ttm_v2_tp_return", 0.0015))
@@ -758,12 +949,14 @@ class ParallelRunner:
             _u_pnl = float(price_ref) - float(pos_v2.entry_price)
             if float(pos_v2.entry_price) > 0:
                 _u_ret = _u_pnl / float(pos_v2.entry_price)
+            _u_ret_for_sig = float(_u_ret)
             _forced_sl = _u_ret <= _sl_ret_long
             _forced_tp = _u_ret >= _tp_ret_long
         elif pos_v2.is_open and price_ref > 0 and pos_v2.side == "SHORT":
             _u_pnl = float(pos_v2.entry_price) - float(price_ref)
             if float(pos_v2.entry_price) > 0:
                 _u_ret = _u_pnl / float(pos_v2.entry_price)
+            _u_ret_for_sig = float(_u_ret)
             _forced_sl = _u_ret <= _sl_ret_short
             _forced_tp = _u_ret >= _tp_ret_short
 
@@ -771,14 +964,28 @@ class ParallelRunner:
         _v2_exit_channel = ""
         _short_exit = None
         if pos_v2.is_open and pos_v2.side == "SHORT":
+            _hb_short = max(int(pos_v2.holding_bars), int(_bars_since_entry))
             _short_exit = check_exhaustion_short_exit(
                 pos_v2.paper_exec_meta,
                 price_ref,
-                max(int(pos_v2.holding_bars), int(_bars_since_entry)),
+                _hb_short,
             )
+            if _short_exit is None:
+                _last_for_short = features_last_row(feats)
+                _short_exit = check_short_v3_structural_exit(
+                    pos_v2.paper_exec_meta,
+                    price_ref,
+                    _hb_short,
+                    _last_for_short,
+                    self.config,
+                )
         if _short_exit is not None:
             _v2_exit_reason = str(_short_exit["reason"])
-            _v2_exit_channel = f"short_exhaustion_{str(_short_exit['trigger']).lower()}"
+            _tr = str(_short_exit["trigger"]).lower()
+            if _tr in ("sl", "tp", "time"):
+                _v2_exit_channel = f"short_exhaustion_{_tr}"
+            else:
+                _v2_exit_channel = f"short_v3_{_tr}"
         elif _forced_sl:
             _v2_exit_reason = "ttm_exit_stop_loss_parallel"
             _v2_exit_channel = "stop_loss_return"
@@ -789,7 +996,34 @@ class ParallelRunner:
             _v2_exit_reason = "ttm_exit_max_bars_parallel"
             _v2_exit_channel = "max_bars_in_trade"
 
-        if _v2_exit_reason:
+        sig_v1 = generate_ttm_signal_v1(
+            feats, self.config, position_side=side_v1, live_mode=False
+        )
+        _ts_int: Optional[int] = None
+        try:
+            _ts_int = int(timestamp) if str(timestamp).isdigit() else None
+        except (TypeError, ValueError):
+            _ts_int = None
+        sig_v2 = generate_ttm_signal_v2(
+            feats,
+            self.config,
+            position_side=side_v2,
+            live_mode=False,
+            adaptive=self.adaptive_context,
+            empirical_engine=self.empirical_engine,
+            bar_timestamp=_ts_int,
+            holding_bars=_holding_v2,
+            position_unrealized_return=_u_ret_for_sig,
+            entry_snapshot=pos_v2.entry_v2_meta if pos_v2.is_open else None,
+            position_meta=pos_v2.paper_exec_meta if pos_v2.is_open else None,
+            current_price=float(price_ref) if price_ref > 0 else None,
+        )
+
+        _dbg2_pre = sig_v2.get("debug") or {}
+        _pl0 = _dbg2_pre.get("prob_long")
+        _ps0 = _dbg2_pre.get("prob_short")
+
+        if _v2_exit_reason and str(sig_v2.get("action", "HOLD")).upper() != "EXIT":
             sig_v2 = {
                 **dict(sig_v2),
                 "action": "EXIT",
@@ -885,6 +1119,7 @@ class ParallelRunner:
         signal_price: Optional[float] = None,
         execution_audit: Optional[Dict[str, Any]] = None,
         entry_calibration: Optional[Dict[str, Any]] = None,
+        v2_closed_flat: Optional[Mapping[str, Any]] = None,
     ) -> None:
         """
         One JSONL row per round-trip: skip ENTRY; on EXIT emit ``event: CLOSED`` with entry+exit fields.
@@ -918,6 +1153,17 @@ class ParallelRunner:
                 row["execution_audit"] = _json_safe(execution_audit)
             if entry_calibration:
                 row["entry_calibration"] = _json_safe(entry_calibration)
+            if str(model).lower() == "v2":
+                v2f = dict(_V2_CLOSED_TRADE_FLAT_DEFAULTS)
+                if entry_bar_index is not None:
+                    v2f["signal_bar_index"] = int(entry_bar_index) - 1
+                if holding_period is not None:
+                    v2f["holding_bars"] = int(holding_period)
+                if v2_closed_flat:
+                    for k, v in v2_closed_flat.items():
+                        if k in v2f:
+                            v2f[k] = v
+                row.update({k: _json_safe(v) for k, v in v2f.items()})
             self._write_jsonl(self._trade_fp, row)
             return
         self._write_jsonl(
@@ -996,6 +1242,8 @@ class ParallelRunner:
                 }
                 feat_sig = pe2.get("features") if isinstance(pe2.get("features"), dict) else {}
                 short_meta = build_exhaustion_short_entry_meta(feat_sig, entry_px, self.config)
+                if short_meta is None:
+                    short_meta = build_short_opportunity_entry_meta(feat_sig, entry_px, self.config)
                 if short_meta:
                     meta.update(short_meta)
                 pos2.open_position(
@@ -1010,6 +1258,7 @@ class ParallelRunner:
                         if str(side_pe).upper() == "LONG"
                         else None
                     ),
+                    entry_v2_meta=pe2.get("entry_v2_meta"),
                 )
                 self._record_v2_follow_design(sig_v2, side_pe)
                 self._pending_entries["v2"] = {}
@@ -1020,6 +1269,8 @@ class ParallelRunner:
             paper_exec_meta = None
             feat_sig = pe2.get("features") if isinstance(pe2.get("features"), dict) else {}
             short_meta = build_exhaustion_short_entry_meta(feat_sig, entry_px, self.config)
+            if short_meta is None:
+                short_meta = build_short_opportunity_entry_meta(feat_sig, entry_px, self.config)
             if short_meta:
                 paper_exec_meta = dict(short_meta)
             pos2.open_position(
@@ -1034,6 +1285,7 @@ class ParallelRunner:
                     if str(pe2.get("side", "LONG")).upper() == "LONG"
                     else None
                 ),
+                entry_v2_meta=pe2.get("entry_v2_meta"),
             )
             self._record_v2_follow_design(sig_v2, str(pe2.get("side", "LONG")))
             self._pending_entries["v2"] = {}
@@ -1086,6 +1338,9 @@ class ParallelRunner:
                         rr = (float(exit_exec_px) - ep) / ep
                     else:
                         rr = (ep - float(exit_exec_px)) / ep
+                v2_flat = None
+                if model == "v2":
+                    v2_flat = self._build_v2_closed_flat(pos, sig_v2, str(side))
                 self._emit_trade(
                     model,
                     "EXIT",
@@ -1108,6 +1363,7 @@ class ParallelRunner:
                         if model == "v2" and str(side).upper() == "LONG"
                         else None
                     ),
+                    v2_closed_flat=v2_flat,
                 )
                 if model == "v1":
                     self._v1_trades.append({"pnl": pnl, "side": side})
@@ -1123,6 +1379,7 @@ class ParallelRunner:
                     sb = bars[bar_index]
                     cfg_e = self.execution_realism
                     due_u = entry_due_unix(sb, int(cfg_e.latency_ms), bs)
+                    snap_v2 = _build_v2_entry_snapshot(sig_v2, a, self.config)
                     self._pending_entries["v2"] = {
                         "side": a,
                         "due_unix": float(due_u),
@@ -1131,11 +1388,15 @@ class ParallelRunner:
                         "signal_close_price": float(price),
                         "signal_timestamp": str(timestamp),
                         "features": feat,
+                        "entry_v2_meta": snap_v2,
                         "entry_calibration": (
                             _v2_long_entry_calibration_from_features(feat) if a == "LONG" else None
                         ),
                     }
                 else:
+                    snap_v2_e = (
+                        _build_v2_entry_snapshot(sig_v2, a, self.config) if model == "v2" else {}
+                    )
                     self._pending_entries[model] = {
                         "side": a,
                         "entry_price": float(price),
@@ -1146,7 +1407,8 @@ class ParallelRunner:
                             {
                                 "entry_calibration": _v2_long_entry_calibration_from_features(feat)
                                 if a == "LONG"
-                                else None
+                                else None,
+                                "entry_v2_meta": snap_v2_e,
                             }
                             if model == "v2"
                             else {}
