@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 import numpy as np
 
@@ -28,6 +28,40 @@ logger = get_logger("ttm_signal_v2")
 
 # Flat entry: so sánh trực tiếp prob với ngưỡng (long ưu tiên nếu cả hai vượt).
 ENTRY_THRESHOLD = 0.6
+
+
+def _v2_eval_hard_long_gate(
+    *,
+    last: Mapping[str, Any],
+    components: Mapping[str, Any],
+    cfg_work: Mapping[str, Any],
+    score_long: float,
+) -> Tuple[bool, str]:
+    """
+    Refactor 20260511: LONG only when tradable breakout, early crowd phase, score above threshold,
+    and risk flags clear. Returns (allowed, block_reason_if_any).
+    """
+    thr_sl = float(cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0))
+    valid_breakout = bool(last.get("breakout_up_filtered_last", last.get("breakout_up")))
+    cp = str(components.get("crowd_phase") or classify_crowd_phase(last, cfg_work))
+    late_fomo = bool(components.get("late_fomo_flag"))
+    exhaustion = bool(last.get("exhaustion_confirm"))
+    failed_breakout = cp == "failed_breakout"
+    phase_ok = cp in ("ignition", "early_continuation")
+    score_ok = float(score_long) > float(thr_sl)
+    if float(score_long) <= float(thr_sl):
+        return False, "score_long_below_threshold"
+    if not valid_breakout:
+        return False, "long_gate_no_valid_breakout"
+    if not phase_ok:
+        return False, "long_gate_crowd_phase"
+    if late_fomo:
+        return False, "long_gate_late_fomo"
+    if exhaustion:
+        return False, "long_gate_exhaustion_confirm"
+    if failed_breakout:
+        return False, "long_gate_failed_breakout"
+    return True, ""
 
 
 def _merge_ttm_config(config: Mapping[str, Any], adaptive: Optional[Any]) -> Dict[str, Any]:
@@ -254,6 +288,15 @@ def generate_ttm_signal_v2(
 
     last = features_last_row(feats)
     last = _merge_last_with_ohlc(last, feats)
+    xst = feats.get("ttm_v2_cross_bar_state") if isinstance(feats, dict) else None
+    if isinstance(xst, dict):
+        last = dict(last)
+        ix = xst.get("ttm_v2_persist_last_upside_breakout_bar_index")
+        if ix is not None:
+            try:
+                last["ttm_v2_persist_last_upside_breakout_bar_index"] = int(ix)
+            except (TypeError, ValueError):
+                pass
     vol_z = float(last.get("vol_z", last.get("vol_zscore", 0.0)) or 0.0)
     vol_z_thr = float(config.get("ttm_v2_vol_z_filter_threshold", -1.0))
 
@@ -750,8 +793,31 @@ def generate_ttm_signal_v2(
     if print_trace:
         print(f"FINAL DECISION: {decision_entry}", flush=True)
 
+    if decision_entry == "LONG" and bool(cfg_work.get("ttm_v2_hard_long_gate_enabled", True)):
+        ok_gate, gate_reason = _v2_eval_hard_long_gate(
+            last=last,
+            components=components,
+            cfg_work=cfg_work,
+            score_long=float(sl),
+        )
+        if not ok_gate:
+            return _log_hold(
+                gate_reason,
+                {
+                    "score_long": float(sl),
+                    "ttm_v2_score_long_entry_threshold": float(
+                        cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0)
+                    ),
+                    "crowd_phase": str(components.get("crowd_phase") or ""),
+                    "decision_source": "hard_long_gate",
+                    "long_gate_reason": gate_reason,
+                },
+            )
+
     if decision_entry == "LONG":
-        if bool(cfg_work.get("ttm_v2_use_effective_strength_v3")):
+        if bool(cfg_work.get("ttm_v2_use_effective_strength_v3")) and not bool(
+            cfg_work.get("ttm_v2_hard_long_gate_enabled", True)
+        ):
             cp = str(components.get("crowd_phase") or "")
             if cp and cp not in ("ignition", "early_continuation"):
                 return _log_hold(

@@ -214,6 +214,10 @@ TTM_CONFIG: Dict[str, Any] = {
     "ttm_v2_use_effective_strength_v3": False,
     "ttm_v2_enable_late_fomo_filter": False,
     "ttm_v2_enable_entry_confirmation": False,
+    # Hard LONG entry gate (score + phase + breakout); paper preset enables below.
+    "ttm_v2_hard_long_gate_enabled": False,
+    # If True, allow LONG fill when only signal-bar breakout was valid (entry bar may fail filtered breakout).
+    "ttm_v2_allow_signal_only_long_execution": False,
     "ttm_v2_enable_soft_min_hold": False,
     # SHORT paper optimization
     "ttm_v2_enable_short_trading": True,
@@ -290,6 +294,9 @@ def build_ttm_research_parallel_config(extra: Optional[Mapping[str, Any]] = None
     cfg["ttm_v2_enable_short_trading"] = bool(
         cfg.get("ttm_v2_enable_short_trading_default_paper", True)
     )
+    # Paper / parallel JSONL: stricter LONG logging + entry-time confirmation (no weight changes).
+    cfg["ttm_v2_hard_long_gate_enabled"] = True
+    cfg["ttm_v2_enable_entry_confirmation"] = True
     if extra:
         cfg.update(dict(extra))
     return cfg

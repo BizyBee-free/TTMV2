@@ -1466,6 +1466,45 @@ def _closed_v2_rows(trades: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ]
 
 
+def _decision_v2_score_components(d: Dict[str, Any]) -> Dict[str, Any]:
+    v2 = d.get("v2") or {}
+    sc = v2.get("score_components")
+    return dict(sc) if isinstance(sc, dict) else {}
+
+
+def _decision_v2_short_components(d: Dict[str, Any]) -> Dict[str, Any]:
+    v2 = d.get("v2") or {}
+    sc = v2.get("short_components")
+    return dict(sc) if isinstance(sc, dict) else {}
+
+
+def _decision_crowd_phase(d: Dict[str, Any]) -> str:
+    sc = _decision_v2_score_components(d)
+    if isinstance(sc.get("crowd_phase"), str) and str(sc.get("crowd_phase")):
+        return str(sc.get("crowd_phase"))
+    v2log = ((d.get("v2") or {}).get("log") or {})
+    if isinstance(v2log.get("crowd_phase"), str) and str(v2log.get("crowd_phase")):
+        return str(v2log.get("crowd_phase"))
+    f = d.get("features") or {}
+    if bool(f.get("exhaustion_confirm")) or bool(f.get("exhaustion_candidate")):
+        return "exhaustion"
+    if bool(f.get("breakout_up_filtered_last", f.get("breakout_up"))):
+        return "ignition"
+    return "no_breakout"
+
+
+def _decision_short_phase(d: Dict[str, Any]) -> str:
+    sh = _decision_v2_short_components(d)
+    if isinstance(sh.get("short_phase"), str) and str(sh.get("short_phase")):
+        return str(sh.get("short_phase"))
+    v2log = ((d.get("v2") or {}).get("log") or {})
+    if isinstance(v2log.get("short_phase"), str) and str(v2log.get("short_phase")):
+        return str(v2log.get("short_phase"))
+    if bool((d.get("features") or {}).get("exhaustion_confirm")):
+        return "short_trigger"
+    return "no_short_context"
+
+
 def _bucket3(values: np.ndarray) -> Tuple[float, float]:
     if values.size == 0:
         return 0.0, 0.0
@@ -1525,18 +1564,6 @@ def _bucket_stats_from_pairs(score: np.ndarray, target: np.ndarray) -> Dict[str,
 
 
 def _partial_sessions_from_meta(meta: Dict[str, Any], decisions: Sequence[Dict[str, Any]]) -> List[str]:
-    out: List[str] = []
-    d_files = [str(x) for x in (meta.get("decision_files") or [])]
-    for fp in d_files:
-        m = re.search(r"_(\d{8})_(\d{4})\.jsonl$", fp.replace("\\", "/"))
-        if not m:
-            continue
-        ymd, hhmm = m.group(1), m.group(2)
-        if hhmm < "1438":
-            out.append(f"{ymd}_{hhmm}")
-    if out:
-        return sorted(list(dict.fromkeys(out)))
-    # fallback from timestamps
     by_date_max: Dict[str, int] = {}
     for d in decisions:
         ts = str(d.get("timestamp", ""))
@@ -1546,10 +1573,57 @@ def _partial_sessions_from_meta(meta: Dict[str, Any], decisions: Sequence[Dict[s
         ymd = dt.strftime("%Y%m%d")
         hhmm = int(dt.strftime("%H%M"))
         by_date_max[ymd] = max(by_date_max.get(ymd, 0), hhmm)
+    out: List[str] = []
     for ymd, hhmm in by_date_max.items():
         if hhmm < 1438:
             out.append(f"{ymd}_{hhmm:04d}")
     return sorted(out)
+
+
+def _series_quantiles(x: np.ndarray) -> Dict[str, Any]:
+    a = np.asarray(x, dtype=np.float64)
+    a = a[np.isfinite(a)]
+    if a.size == 0:
+        return {"count": 0, "min": None, "p50": None, "p80": None, "p90": None, "p95": None, "max": None}
+    return {
+        "count": int(a.size),
+        "min": float(np.min(a)),
+        "p50": float(np.quantile(a, 0.50)),
+        "p80": float(np.quantile(a, 0.80)),
+        "p90": float(np.quantile(a, 0.90)),
+        "p95": float(np.quantile(a, 0.95)),
+        "max": float(np.max(a)),
+    }
+
+
+def _infer_last_bar_return_unit(raw: np.ndarray) -> str:
+    a = np.asarray(raw, dtype=np.float64)
+    a = a[np.isfinite(a)]
+    if a.size == 0:
+        return "unknown"
+    mx = float(np.max(np.abs(a)))
+    if mx <= 0.05:
+        return "fraction_return"
+    if mx <= 5.0:
+        return "percent_or_points"
+    return "unknown_large_scale"
+
+
+def _nondegenerate_spike_threshold(pos: np.ndarray) -> Tuple[Optional[float], str]:
+    a = np.asarray(pos, dtype=np.float64)
+    a = a[np.isfinite(a)]
+    if a.size == 0:
+        return None, "empty"
+    q80 = float(np.quantile(a, 0.80))
+    if q80 > 0.0:
+        return q80, "all_values_p80"
+    pos_only = a[a > 0.0]
+    if pos_only.size == 0:
+        return None, "all_zero_or_negative"
+    q80_pos = float(np.quantile(pos_only, 0.80))
+    if q80_pos > 0.0:
+        return q80_pos, "positive_subset_p80"
+    return float(np.max(pos_only)), "positive_subset_max"
 
 
 def build_refactor5_report(
@@ -1570,6 +1644,18 @@ def build_refactor5_report(
     long_closed = [t for t in closed if str(t.get("side", "")).upper() == "LONG"]
     short_closed = [t for t in closed if str(t.get("side", "")).upper() == "SHORT"]
     partial_sessions = _partial_sessions_from_meta(merge_meta, decisions)
+    if date_start is None or date_end is None:
+        all_ymd: List[str] = []
+        for d in decisions:
+            ts = str(d.get("timestamp", ""))
+            if len(ts) >= 10 and ts.isdigit():
+                dt = datetime.utcfromtimestamp(int(ts) + 7 * 3600)
+                all_ymd.append(dt.strftime("%Y%m%d"))
+        if all_ymd:
+            if date_start is None:
+                date_start = min(all_ymd)
+            if date_end is None:
+                date_end = max(all_ymd)
 
     dataset_summary = {
         "n_decisions": int(len(decisions)),
@@ -1650,23 +1736,32 @@ def build_refactor5_report(
         if not np.isfinite(fr):
             continue
         lbr_raw.append(float(_feature_float(d, "last_bar_return")))
-        sc = (d.get("v2") or {}).get("score_components") or {}
+        sc = _decision_v2_score_components(d)
         lbr_pos.append(float(sc.get("positive_last_bar_return") or 0.0))
         lbr_fwd.append(float(fr))
     lbr_raw_a = np.asarray(lbr_raw, dtype=np.float64)
     lbr_pos_a = np.asarray(lbr_pos, dtype=np.float64)
     lbr_fwd_a = np.asarray(lbr_fwd, dtype=np.float64)
-    spike_thr = float(np.nanquantile(lbr_pos_a, 0.8)) if lbr_pos_a.size else 0.0
-    spike_mask = lbr_pos_a >= spike_thr if lbr_pos_a.size else np.array([], dtype=bool)
+    spike_thr, spike_method = _nondegenerate_spike_threshold(lbr_pos_a)
+    spike_mask = (
+        (lbr_pos_a >= float(spike_thr)) & (lbr_pos_a > 0.0)
+        if (lbr_pos_a.size and spike_thr is not None)
+        else np.zeros(lbr_pos_a.shape, dtype=bool)
+    )
     non_mask = ~spike_mask if lbr_pos_a.size else np.array([], dtype=bool)
     last_bar_return_impact = {
         "bucket_last_bar_return_raw": _bucket_stats_from_pairs(lbr_raw_a, lbr_fwd_a),
         "bucket_positive_last_bar_return": _bucket_stats_from_pairs(lbr_pos_a, lbr_fwd_a),
-        "spike_threshold_candidate": spike_thr if np.isfinite(spike_thr) else None,
+        "raw_last_bar_return_stats": _series_quantiles(lbr_raw_a),
+        "positive_last_bar_return_stats": _series_quantiles(lbr_pos_a),
+        "last_bar_return_unit_inference": _infer_last_bar_return_unit(lbr_raw_a),
+        "spike_threshold_candidate": spike_thr,
+        "spike_threshold_method": spike_method,
         "spike_count": int(np.sum(spike_mask)) if spike_mask.size else 0,
         "non_spike_count": int(np.sum(non_mask)) if non_mask.size else 0,
         "spike_mean_forward_return": float(np.mean(lbr_fwd_a[spike_mask])) if spike_mask.size and np.any(spike_mask) else None,
         "non_spike_mean_forward_return": float(np.mean(lbr_fwd_a[non_mask])) if non_mask.size and np.any(non_mask) else None,
+        "spike_bucket_non_degenerate": bool(np.any(spike_mask) and np.any(non_mask)) if lbr_pos_a.size else False,
         "question_answer": {
             "spike_worse_trade_quality": (
                 bool(np.mean(lbr_fwd_a[spike_mask]) < np.mean(lbr_fwd_a[non_mask]))
@@ -1684,8 +1779,7 @@ def build_refactor5_report(
         phase_rows[ph] = {"decision_count": 0, "trade_count": 0, "fwd": [], "pnl": [], "holding": [], "mfe": [], "mae": []}
     for d in decisions:
         bi = int(d.get("bar_index", -1))
-        v2log = ((d.get("v2") or {}).get("log") or {})
-        ph = str(v2log.get("crowd_phase") or "no_breakout")
+        ph = _decision_crowd_phase(d)
         if ph not in phase_rows:
             continue
         phase_rows[ph]["decision_count"] += 1
@@ -1693,7 +1787,15 @@ def build_refactor5_report(
         if np.isfinite(fr):
             phase_rows[ph]["fwd"].append(float(fr))
     for t in closed:
-        ph = str(t.get("entry_crowd_phase") or "no_breakout")
+        ph = str(t.get("entry_crowd_phase") or "")
+        if not ph and t.get("entry_bar_index") is not None:
+            d_ent = by_bar.get(int(t.get("entry_bar_index")))
+            if d_ent is None:
+                d_ent = by_bar.get(int(t.get("entry_bar_index")) - 1)
+            if d_ent is not None:
+                ph = _decision_crowd_phase(d_ent)
+        if not ph:
+            ph = "no_breakout"
         if ph not in phase_rows:
             continue
         phase_rows[ph]["trade_count"] += 1
@@ -1738,12 +1840,12 @@ def build_refactor5_report(
         d = by_bar.get(int(ebi) - 1) or by_bar.get(int(ebi))
         if not d:
             continue
-        sc = ((d.get("v2") or {}).get("score_components") or {})
+        sc = _decision_v2_score_components(d)
         f = d.get("features") or {}
         blocked_flags = {
             "late_fomo": bool(sc.get("late_fomo_flag")),
             "exhaustion": bool(f.get("exhaustion_confirm")),
-            "last_bar_return_spike": bool(float(sc.get("positive_last_bar_return") or 0.0) >= spike_thr),
+            "last_bar_return_spike": bool(spike_thr is not None and float(sc.get("positive_last_bar_return") or 0.0) >= float(spike_thr) and float(sc.get("positive_last_bar_return") or 0.0) > 0.0),
             "score_below_threshold": bool(float((d.get("v2") or {}).get("score_long") or 0.0) < float(TTM_CONFIG.get("ttm_v2_score_long_entry_threshold", 0.0))),
             "failed_breakout": bool((not bool(f.get("breakout_up"))) and float(f.get("failure_strength") or 0.0) >= float(TTM_CONFIG.get("ttm_v2_failed_breakout_failure_min", 0.35))),
         }
@@ -1849,6 +1951,8 @@ def build_refactor5_report(
         "avg_holding": float(np.mean([_safe_float(t.get("holding_period")) for t in short_closed if _safe_float(t.get("holding_period")) is not None])) if short_closed else None,
         "entry_short_phase_distribution": dict(Counter(str(t.get("short_entry_phase") or "unknown") for t in short_closed)),
         "exit_reason_distribution": dict(Counter(str(t.get("exit_reason") or "unknown") for t in short_closed)),
+        "unknown_entry_short_phase_count": int(sum(1 for t in short_closed if str(t.get("short_entry_phase") or "unknown") == "unknown")),
+        "unknown_exit_reason_count": int(sum(1 for t in short_closed if str(t.get("exit_reason") or "unknown") == "unknown")),
     }
     cand_map: Dict[str, List[Tuple[float, float]]] = {}
     all_short_scores: List[float] = []
@@ -1859,8 +1963,8 @@ def build_refactor5_report(
         fr = _forward_return(closes, bi, forward_horizon)
         if not np.isfinite(fr):
             continue
-        sh = ((d.get("v2") or {}).get("short_components") or {})
-        ph = str(sh.get("short_phase") or "no_short_context")
+        sh = _decision_v2_short_components(d)
+        ph = str(sh.get("short_phase") or _decision_short_phase(d) or "no_short_context")
         if ph not in phase_alias:
             continue
         sscore = _safe_float(sh.get("short_score"))
@@ -2013,30 +2117,45 @@ def build_refactor5_report(
 
     # acceptance checklist (refactor_5)
     n_dec = max(1, len(decisions))
-    score_comp_count = sum(1 for d in decisions if isinstance(((d.get("v2") or {}).get("score_components")), dict))
-    short_comp_count = sum(1 for d in decisions if isinstance(((d.get("v2") or {}).get("short_components")), dict))
+    score_comp_count = sum(1 for d in decisions if isinstance(((d.get("v2") or {}).get("score_components")), dict) and len(((d.get("v2") or {}).get("score_components")) or {}) > 0)
+    short_comp_count = sum(1 for d in decisions if isinstance(((d.get("v2") or {}).get("short_components")), dict) and len(((d.get("v2") or {}).get("short_components")) or {}) > 0)
     cov_score = float(score_comp_count / n_dec)
     cov_short = float(short_comp_count / n_dec)
-    # Backward compatibility: legacy logs may have 0 coverage but should still be readable.
-    all_dec_have_components = ((cov_score >= 0.9 and cov_short >= 0.9) or (cov_score == 0.0 and cov_short == 0.0))
-    # Accept derived "unknown" when legacy CLOSED rows miss exit_reason.
-    all_trade_exit_reason = all((str(t.get("exit_reason") or "unknown") != "") for t in closed) if closed else True
-    all_trade_phases = all(
-        (
-            (t.get("entry_crowd_phase") is not None)
-            or (t.get("short_entry_phase") is not None)
-            or True  # backward compatibility for old logs
-        )
-        for t in closed
-    ) if closed else True
+    score_components_ok = bool(cov_score >= 0.95)
+    short_components_ok = bool(cov_short >= 0.95)
+    coverage_ok = bool(score_components_ok and short_components_ok)
+    unknown_exit_count = sum(1 for t in closed if str(t.get("exit_reason") or "unknown") == "unknown")
+    all_trade_exit_reason = bool(len(closed) == 0 or unknown_exit_count < len(closed))
+    actual_short_unknown_phase_count = sum(
+        1 for t in short_closed if str(t.get("short_entry_phase") or "unknown") == "unknown"
+    )
+    actual_short_unknown_exit_reason_count = sum(
+        1 for t in short_closed if str(t.get("exit_reason") or "unknown") == "unknown"
+    )
+    all_trade_phases = bool(
+        len(short_closed) == 0 or actual_short_unknown_phase_count < len(short_closed)
+    )
+    non_no_breakout_decisions = sum(
+        int(r.get("decision_count", 0))
+        for r in crowd_phase_performance
+        if str(r.get("phase")) != "no_breakout"
+    )
+    phase_wired_ok = bool(
+        int(breakout_health.get("n_valid_breakout") or 0) <= 0 or non_no_breakout_decisions > 0
+    )
     acceptance = {
         "logging": {
-            "every_decision_has_v2_score_components": all_dec_have_components,
-            "every_decision_has_v2_short_components": all_dec_have_components,
+            "every_decision_has_v2_score_components": score_components_ok,
+            "every_decision_has_v2_short_components": short_components_ok,
             "every_trade_has_entry_exit_phase_if_available": all_trade_phases,
             "every_trade_has_exit_reason": all_trade_exit_reason,
             "decision_score_components_coverage": cov_score,
             "decision_short_components_coverage": cov_short,
+            "coverage_threshold": 0.95,
+            "phase_wired_ok": phase_wired_ok,
+            "unknown_exit_reason_count": int(unknown_exit_count),
+            "actual_short_unknown_phase_count": int(actual_short_unknown_phase_count),
+            "actual_short_unknown_exit_reason_count": int(actual_short_unknown_exit_reason_count),
         },
         "exit": {
             "holding_period_stats_reported": bool(holding_period_performance),
@@ -2049,13 +2168,15 @@ def build_refactor5_report(
             ) if closed else True,
             "simulations_marked": True,
         },
-        "overall_acceptance": bool(all_dec_have_components and all_trade_exit_reason),
+        "overall_acceptance": bool(
+            coverage_ok
+            and phase_wired_ok
+            and all_trade_exit_reason
+            and all_trade_phases
+            and (len(short_closed) == 0 or actual_short_unknown_exit_reason_count < len(short_closed))
+        ),
     }
     insufficient_sample_warnings: List[str] = []
-    if cov_score == 0.0 and cov_short == 0.0:
-        insufficient_sample_warnings.append(
-            "legacy decision logs without v2 score_components/short_components; acceptance uses backward-compat mode"
-        )
     if scoring_long["score_long"].get("insufficient_sample"):
         insufficient_sample_warnings.append("score_long sample insufficient for strong ranking inference")
     if len(short_closed) < 20:

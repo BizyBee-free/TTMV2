@@ -121,7 +121,13 @@ def test_v2_exit_trade_rows_include_entry_trace_fields(tmp_path: Path) -> None:
     ]
     dec = tmp_path / "dec2.jsonl"
     trd = tmp_path / "tr2.jsonl"
-    replay_bars(data_series, config={**TTM_CONFIG}, decision_log_path=str(dec), trade_log_path=str(trd))
+    # Disable strict 20260511 gates for this structural replay (synthetic bars rarely pass phase+score).
+    cfg = {
+        **TTM_CONFIG,
+        "ttm_v2_hard_long_gate_enabled": False,
+        "ttm_v2_enable_entry_confirmation": False,
+    }
+    replay_bars(data_series, config=cfg, decision_log_path=str(dec), trade_log_path=str(trd))
     closed_v2: list[dict] = []
     for line in trd.read_text(encoding="utf-8").strip().splitlines():
         o = json.loads(line)

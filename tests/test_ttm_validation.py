@@ -345,6 +345,81 @@ def test_refactor5_report_sections_present(tmp_path: Path) -> None:
     assert "acceptance" in r5
 
 
+def test_refactor5_acceptance_fails_when_component_coverage_zero(tmp_path: Path) -> None:
+    closes = [100.0 + 0.01 * i for i in range(20)]
+    (tmp_path / "closes.json").write_text(json.dumps(closes), encoding="utf-8")
+    decisions = [
+        {
+            "event_type": "decision",
+            "bar_index": i,
+            "timestamp": str(1700000000 + i * 300),
+            "features": {"breakout_up_filtered_last": bool(i % 4 == 0)},
+            "v2": {"score_long": 0.1, "score_short": -0.1, "log": {"crowd_phase": "no_breakout"}},
+        }
+        for i in range(20)
+    ]
+    trades = [
+        {
+            "event_type": "trade",
+            "model": "v2",
+            "event": "CLOSED",
+            "bar_index": 5,
+            "entry_bar_index": 4,
+            "exit_bar_index": 5,
+            "side": "LONG",
+            "realized_return": 0.001,
+            "holding_period": 1,
+            "exit_reason": "unknown",
+            "signal_bar_index": 3,
+        }
+    ]
+    dec = tmp_path / "dec_zero_cov.jsonl"
+    trd = tmp_path / "tr_zero_cov.jsonl"
+    _write_jsonl(dec, decisions)
+    _write_jsonl(trd, trades)
+    r = run_validation(dec, trd, closes_path=(tmp_path / "closes.json"), min_trades_adaptive=1)
+    acc = (r.get("refactor5_report") or {}).get("acceptance") or {}
+    assert acc.get("overall_acceptance") is False
+    assert ((acc.get("logging") or {}).get("decision_score_components_coverage")) == 0.0
+
+
+def test_refactor5_last_bar_return_spike_bucket_non_degenerate(tmp_path: Path) -> None:
+    closes = [100.0 + 0.01 * i for i in range(40)]
+    (tmp_path / "closes.json").write_text(json.dumps(closes), encoding="utf-8")
+    decisions = []
+    for i in range(40):
+        pos = 0.0 if i < 30 else 0.2 + 0.01 * (i - 30)
+        decisions.append(
+            {
+                "event_type": "decision",
+                "bar_index": i,
+                "timestamp": str(1700000000 + i * 300),
+                "features": {
+                    "breakout_up_filtered_last": True,
+                    "last_bar_return": 0.001 * (i - 20),
+                    "effective_strength": 0.2,
+                    "raw_strength": 1.0,
+                },
+                "v2": {
+                    "score_long": 0.3,
+                    "score_short": -0.3,
+                    "score_components": {"positive_last_bar_return": pos, "crowd_phase": "ignition"},
+                    "short_components": {"short_phase": "no_short_context"},
+                    "log": {"crowd_phase": "ignition"},
+                },
+            }
+        )
+    dec = tmp_path / "dec_spike.jsonl"
+    trd = tmp_path / "tr_spike.jsonl"
+    _write_jsonl(dec, decisions)
+    _write_jsonl(trd, [])
+    r = run_validation(dec, trd, closes_path=(tmp_path / "closes.json"), min_trades_adaptive=1)
+    lbr = ((r.get("refactor5_report") or {}).get("last_bar_return_impact") or {})
+    assert lbr.get("spike_bucket_non_degenerate") is True
+    assert (lbr.get("non_spike_count") or 0) > 0
+    assert (lbr.get("spike_count") or 0) > 0
+
+
 @pytest.mark.parametrize(
     "fname",
     [

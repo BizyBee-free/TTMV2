@@ -49,6 +49,15 @@ def compute_short_opportunity_v3(
     bi = int(bar_index)
     lookback = max(5, int(config.get("ttm_v2_short_prior_breakout_lookback", 40)))
     last_j = _last_prior_breakout_bar(feats, bi, lookback)
+    if last_j is None and isinstance(last, Mapping):
+        p_ix = last.get("ttm_v2_persist_last_upside_breakout_bar_index")
+        if p_ix is not None:
+            try:
+                pi = int(p_ix)
+            except (TypeError, ValueError):
+                pi = None
+            if pi is not None and 0 <= pi <= bi and (bi - pi) <= lookback:
+                last_j = pi
     prior_upside_breakout_exists = last_j is not None
     last_upside_breakout_bar_index = int(last_j) if last_j is not None else None
     bars_since_upside_breakout = int(bi - last_j) if last_j is not None else None

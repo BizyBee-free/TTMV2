@@ -174,12 +174,15 @@ def compute_score_v2_alpha(
     if eff_slice is None:
         eff_slice = np.where(bu, brk, 0.0)
     use_v3 = bool(config.get("ttm_v2_use_effective_strength_v3", False))
+    from src.strategies.ttm.ttm_features import features_row_at
+    from src.strategies.ttm.ttm_v2_effective_strength import compute_effective_strength_v3
+
+    # Logging/instrumentation always computes v3 diagnostics, but trading behavior only
+    # switches to v3 score when the config flag is enabled.
+    v3_diag = compute_effective_strength_v3(feats, last, bi, config)
     v3_now: Optional[Dict[str, Any]] = None
     if use_v3:
-        from src.strategies.ttm.ttm_features import features_row_at
-        from src.strategies.ttm.ttm_v2_effective_strength import compute_effective_strength_v3
-
-        v3_now = compute_effective_strength_v3(feats, last, bi, config)
+        v3_now = v3_diag
         valid_long = bool(last.get("breakout_up_filtered_last", last.get("breakout_up")))
         score_long = float(v3_now["score_long"]) if valid_long else 0.0
         eff_last = float(v3_now["effective_strength"])
@@ -237,33 +240,34 @@ def compute_score_v2_alpha(
         score_short = float(np.clip(np.tanh(alpha_raw_short) * cap, -cap, cap))
 
     use_short_v3 = bool(config.get("ttm_v2_use_short_effective_strength_v3", False))
+    from src.strategies.ttm.ttm_v2_phases import classify_crowd_phase
+    from src.strategies.ttm.ttm_v2_short_opportunity import compute_short_opportunity_v3
+
+    if v3_diag is not None:
+        long_comp_diag: Dict[str, Any] = {
+            "crowd_phase": str(v3_diag["crowd_phase"]),
+            "continuation_confirm": float(v3_diag["continuation_confirm"]),
+            "score_long": float(v3_diag["score_long"]),
+            "positive_last_bar_return": float(v3_diag["positive_last_bar_return"]),
+            "late_phase_penalty": float(v3_diag["late_phase_penalty"]),
+            "extension": float(v3_diag["extension"]),
+        }
+    else:
+        mom_ = float(last.get("momentum_1_z") or 0.0)
+        lb_ = float(last.get("last_bar_return") or 0.0)
+        long_comp_diag = {
+            "crowd_phase": str(classify_crowd_phase(last, config)),
+            "continuation_confirm": float(np.tanh(mom_ / 2.0)),
+            "score_long": float(score_long),
+            "positive_last_bar_return": float(max(0.0, np.tanh(lb_ * 6.0))),
+            "late_phase_penalty": 0.0,
+            "extension": abs(float(last.get("extension") or last.get("price_z") or 0.0)),
+        }
+    short_diag = compute_short_opportunity_v3(feats, last, bi, config, long_comp_diag)
+
     short_state: Optional[Dict[str, Any]] = None
     if use_short_v3:
-        from src.strategies.ttm.ttm_features import features_row_at
-        from src.strategies.ttm.ttm_v2_phases import classify_crowd_phase
-        from src.strategies.ttm.ttm_v2_short_opportunity import compute_short_opportunity_v3
-
-        if v3_now is not None:
-            long_comp: Dict[str, Any] = {
-                "crowd_phase": str(v3_now["crowd_phase"]),
-                "continuation_confirm": float(v3_now["continuation_confirm"]),
-                "score_long": float(score_long),
-                "positive_last_bar_return": float(v3_now["positive_last_bar_return"]),
-                "late_phase_penalty": float(v3_now["late_phase_penalty"]),
-                "extension": float(v3_now["extension"]),
-            }
-        else:
-            mom_ = float(last.get("momentum_1_z") or 0.0)
-            lb_ = float(last.get("last_bar_return") or 0.0)
-            long_comp = {
-                "crowd_phase": str(classify_crowd_phase(last, config)),
-                "continuation_confirm": float(np.tanh(mom_ / 2.0)),
-                "score_long": float(score_long),
-                "positive_last_bar_return": float(max(0.0, np.tanh(lb_ * 6.0))),
-                "late_phase_penalty": 0.0,
-                "extension": abs(float(last.get("extension") or last.get("price_z") or 0.0)),
-            }
-        short_state = compute_short_opportunity_v3(feats, last, bi, config, long_comp)
+        short_state = short_diag
         alpha_raw_short = float(short_state["short_effective_strength_raw"])
         lo_sr = max(0, bi - rank_win + 1)
         sr_list: list[float] = []
@@ -353,10 +357,10 @@ def compute_score_v2_alpha(
         # Legacy key for follow_design / diagnostics: sign carries side preference.
         "momentum": score_long - score_short,
     }
-    if v3_now is not None:
-        components["crowd_phase"] = str(v3_now["crowd_phase"])
-        components["late_fomo_flag"] = bool(v3_now["late_fomo_flag"])
-        er = v3_now.get("entry_block_reason")
+    if v3_diag is not None:
+        components["crowd_phase"] = str(v3_diag["crowd_phase"])
+        components["late_fomo_flag"] = bool(v3_diag["late_fomo_flag"])
+        er = v3_diag.get("entry_block_reason")
         components["entry_block_reason"] = er
         for _k in (
             "breakout_conviction",
@@ -369,15 +373,17 @@ def compute_score_v2_alpha(
             "positive_last_bar_return",
             "late_phase_penalty",
         ):
-            components[_k] = float(v3_now[_k])
-        components["effective_strength_v3_raw"] = float(v3_now["effective_strength_raw"])
-    if short_state is not None:
-        for _sk, _sv in short_state.items():
+            components[_k] = float(v3_diag[_k])
+        components["effective_strength_v3_raw"] = float(v3_diag["effective_strength_raw"])
+    if short_diag is not None:
+        for _sk, _sv in short_diag.items():
             if str(_sk).startswith("_") or _sk == "short_score":
                 continue
             components[str(_sk)] = _sv
+        components["alpha_raw_short_diag"] = float(short_diag["short_effective_strength_raw"])
+        components["short_score_unit"] = float(short_diag["short_score"])
+    if short_state is not None:
         components["alpha_raw_short"] = float(short_state["short_effective_strength_raw"])
-        components["short_score_unit"] = float(short_state["short_score"])
     if bool(config.get("ttm_strict_asserts", False)):
         if not (np.isfinite(score_long) and np.isfinite(score_short)):
             raise ValueError("non-finite score from compute_score_v2_alpha")
