@@ -81,7 +81,7 @@ class StrategyAlgo(str, Enum):
 SYMBOL_MAP: Dict[str, Dict[str, str]] = {
     "VN30F1M": {
         "data_symbol": "VN30F1M",
-        "trade_symbol": "41I1G4000",
+        "trade_symbol": "41I1G6000",
         "type": "derivative",
     },
     "VN30": {
@@ -696,7 +696,7 @@ class Settings(BaseSettings):
     VN30_F1M_TRADE_SYMBOL: str = Field(
         default="",
         description=(
-            "Mã KRX 9 ký tự cho hợp đồng VN30 front-month (vd. 41I1G5000). Đặt trong .env: áp vào "
+            "Mã KRX 9 ký tự cho hợp đồng VN30 front-month (vd. 41I1G6000). Đặt trong .env: áp vào "
             "SYMBOL_MAP['VN30F1M']['trade_symbol'] khi load get_settings() / khởi tạo BeeTradeClient; "
             "ưu tiên hơn VN30_AUTO_RESOLVE (không gọi /instruments). Để trống = không ép từ env."
         ),

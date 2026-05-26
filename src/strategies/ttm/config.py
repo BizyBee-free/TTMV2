@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional
 
+from src.strategies.ttm.ttm_v2_gates import research_score_long_floor
+
 
 def is_ttm_adaptive_learning_enabled(cfg: Mapping[str, Any]) -> bool:
     """
@@ -216,6 +218,27 @@ TTM_CONFIG: Dict[str, Any] = {
     "ttm_v2_enable_entry_confirmation": False,
     # Hard LONG entry gate (score + phase + breakout); paper preset enables below.
     "ttm_v2_hard_long_gate_enabled": False,
+    # Gate mode: strict (live), quality_research / exploratory_research (backtest), shadow_only (strict trades + shadow diagnostics).
+    "ttm_v2_gate_mode": "strict",
+    "ttm_v2_research_candidate_window_bars": 4,
+    "ttm_v2_research_score_floor_abs": -0.50,
+    "ttm_v2_research_score_long_floor": -0.50,
+    # v3 effective-strength scores are typically << 0 on valid ignition; paper uses this fallback floor.
+    "ttm_v2_research_score_long_floor_when_v3": -0.50,
+    "ttm_v2_research_short_score_floor": 0.0,
+    "ttm_v2_rolling_candidate_score_percentile_40": 0.40,
+    "ttm_v2_rolling_candidate_score_percentile_60": 0.60,
+    "ttm_v2_research_percentile_min_prior_candidates": 3,
+    "ttm_v2_research_entry_hard_adverse_return": -0.0015,
+    "ttm_v2_max_research_trades_per_day": 3,
+    "ttm_v2_max_research_long_trades_per_day": 2,
+    "ttm_v2_max_research_short_trades_per_day": 1,
+    "ttm_v2_min_bars_between_research_trades": 3,
+    # Research entry prob gate (paper/backtest only; strict/live keeps entry_threshold).
+    "ttm_v2_research_use_prob_gate": False,
+    "ttm_v2_quality_research_prob_floor": 0.20,
+    "ttm_v2_exploratory_research_prob_floor": 0.05,
+    "ttm_v2_research_allow_candidate_without_prob_gate": False,
     # If True, allow LONG fill when only signal-bar breakout was valid (entry bar may fail filtered breakout).
     "ttm_v2_allow_signal_only_long_execution": False,
     "ttm_v2_enable_soft_min_hold": False,
@@ -244,6 +267,7 @@ TTM_CONFIG: Dict[str, Any] = {
     "ttm_v2_w_short_chase_risk": 0.8,
     # LONG thresholds
     "ttm_v2_score_long_entry_threshold": 0.0,
+    "ttm_v2_early_continuation_threshold": 0.2,
     "ttm_v2_late_fomo_threshold": 0.7,
     "ttm_v2_last_bar_return_spike_threshold": None,
     "ttm_v2_extension_late_threshold": None,
@@ -295,8 +319,16 @@ def build_ttm_research_parallel_config(extra: Optional[Mapping[str, Any]] = None
         cfg.get("ttm_v2_enable_short_trading_default_paper", True)
     )
     # Paper / parallel JSONL: stricter LONG logging + entry-time confirmation (no weight changes).
+    cfg["ttm_v2_use_effective_strength_v3"] = True
+    cfg["ttm_v2_use_short_effective_strength_v3"] = True
     cfg["ttm_v2_hard_long_gate_enabled"] = True
     cfg["ttm_v2_enable_entry_confirmation"] = True
+    cfg["ttm_v2_gate_mode"] = "quality_research"
+    cfg["ttm_v2_research_score_long_floor"] = research_score_long_floor(cfg)
+    cfg["ttm_v2_research_score_floor_abs"] = research_score_long_floor(cfg)
+    cfg["ttm_v2_allow_signal_only_long_execution"] = True
+    cfg["ttm_v2_research_use_prob_gate"] = True
+    cfg["ttm_v2_research_allow_candidate_without_prob_gate"] = True
     if extra:
         cfg.update(dict(extra))
     return cfg
@@ -318,11 +350,22 @@ def build_ttm_live_adaptive_config(extra: Optional[Mapping[str, Any]] = None) ->
     cfg["ttm_v2_enable_short_trading"] = bool(
         cfg.get("ttm_v2_enable_short_trading_default_live", False)
     )
+    cfg["ttm_v2_gate_mode"] = "strict"
     if extra:
         cfg.update(dict(extra))
     return cfg
 
 
 def build_ttm_paper_live_config(extra: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """Backward-compatible alias: same as :func:`build_ttm_research_parallel_config`."""
-    return build_ttm_research_parallel_config(extra)
+    """
+    Paper-live session (``paper_test`` / ``ParallelRunner``): execute ``quality_research`` tier.
+
+    Exploratory tier is logged only (counterfactual) via ``gate_diagnostics`` fields
+    ``exploratory_research_long_allowed`` / ``exploratory_research_block_reason`` on every bar —
+    no exploratory trades unless ``ttm_v2_gate_mode`` is overridden to ``exploratory_research``.
+    """
+    merged: Dict[str, Any] = dict(extra or {})
+    merged.setdefault("ttm_v2_gate_mode", "quality_research")
+    cfg = build_ttm_research_parallel_config(merged)
+    cfg["ttm_config_profile"] = "paper_live"
+    return cfg

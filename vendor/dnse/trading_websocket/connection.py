@@ -39,12 +39,25 @@ class WebSocketConnection:
         self._retry_count = 0
         self._is_connected = False
 
-    async def connect(self) -> None:
-        while self._retry_count < self.max_retries:
+    async def prepare_reconnect(self) -> None:
+        """Close stale socket and reset retry budget for a new connect session."""
+        if self._ws is not None:
             try:
-                logger.info(
-                    f"Connecting to {self.url} (attempt {self._retry_count + 1}/{self.max_retries})"
-                )
+                await self._ws.close()
+            except Exception:
+                pass
+        self._mark_disconnected()
+        self._retry_count = 0
+
+    async def connect(self, *, max_attempts: Optional[int] = None) -> None:
+        """Connect with retries. Each call gets a fresh retry budget (fixes stuck reconnect)."""
+        await self.prepare_reconnect()
+        limit = int(max_attempts) if max_attempts is not None else int(self.max_retries)
+        limit = max(1, limit)
+        last_err: Optional[Exception] = None
+        for attempt in range(1, limit + 1):
+            try:
+                logger.info(f"Connecting to {self.url} (attempt {attempt}/{limit})")
                 ssl_context = ssl.create_default_context(cafile=certifi.where())
                 # Gateway DNSE + PyPI ``dnse`` dùng ``websockets.connect(..., ssl=True)`` không bật ping tự động;
                 # ping_interval mặc định có thể gây đóng 1006 sớm với một số phiên bản websockets.
@@ -66,51 +79,65 @@ class WebSocketConnection:
                 return
 
             except (websockets.exceptions.WebSocketException, OSError) as e:
-                self._retry_count += 1
-
-                if self._retry_count >= self.max_retries:
+                last_err = e
+                self._mark_disconnected()
+                if attempt >= limit:
                     raise ConnectionError(
-                        f"Failed to connect after {self.max_retries} attempts: {e}"
-                    )
+                        f"Failed to connect after {limit} attempts: {e}"
+                    ) from e
 
-                delay = min(2 ** (self._retry_count - 1), 60)
+                delay = min(2 ** (attempt - 1), 60)
                 logger.warning(f"Connection failed: {e}. Retrying in {delay}s...")
                 await asyncio.sleep(delay)
 
+        raise ConnectionError(
+            f"Failed to connect after {limit} attempts: {last_err or 'unknown'}"
+        )
+
+    def _mark_disconnected(self) -> None:
+        self._is_connected = False
+        self._ws = None
+
+    def _raise_not_connected(self) -> None:
+        """Signal listen loop to reconnect instead of spinning on ConnectionError."""
+        if self.auto_reconnect:
+            raise ConnectionClosed("Not connected", recoverable=True)
+        raise ConnectionError("Not connected")
+
+    def _connection_closed_exc(
+        self, e: websockets.exceptions.ConnectionClosed
+    ) -> ConnectionClosed:
+        self._mark_disconnected()
+        if e.code in (1000, 1001):
+            logger.info(f"Connection closed normally: {e.code}")
+            return ConnectionClosed(f"Connection closed normally: {e}")
+        logger.warning(f"Connection closed: code={e.code} reason={e.reason!r}")
+        if self.auto_reconnect:
+            return ConnectionClosed(f"Connection closed: {e}", recoverable=True)
+        return ConnectionClosed(f"Connection closed: {e}")
+
     async def send(self, message: bytes) -> None:
         if not self._ws or not self._is_connected:
-            raise ConnectionError("Not connected")
-        await self._ws.send(message)
+            self._raise_not_connected()
+        try:
+            await self._ws.send(message)
+        except websockets.exceptions.ConnectionClosed as e:
+            raise self._connection_closed_exc(e) from e
 
     async def receive(self) -> bytes:
         if not self._ws or not self._is_connected:
-            raise ConnectionError("Not connected")
+            self._raise_not_connected()
 
         try:
             message = await self._ws.recv()
             return message if isinstance(message, bytes) else message.encode()
         except websockets.exceptions.ConnectionClosed as e:
-            self._is_connected = False
-
-            if e.code in (1000, 1001):
-                logger.info(f"Connection closed normally: {e.code}")
-                raise ConnectionClosed(f"Connection closed normally: {e}")
-            elif e.code in (1006, 1011, 1012):
-                logger.warning(f"Connection closed abnormally: {e.code}")
-                if self.auto_reconnect:
-                    raise ConnectionClosed(
-                        f"Connection closed abnormally: {e}", recoverable=True
-                    )
-                else:
-                    raise ConnectionClosed(f"Connection closed abnormally: {e}")
-            else:
-                logger.error(f"Connection closed with unexpected code: {e.code}")
-                raise ConnectionClosed(f"Connection closed: {e}")
+            raise self._connection_closed_exc(e) from e
 
     async def close(self) -> None:
         if self._ws:
             await self._ws.close()
-        self._is_connected = False
+        self._mark_disconnected()
         logger.info("Connection closed")
 
     @property

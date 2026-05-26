@@ -199,6 +199,7 @@ class TradingClient:
         self._top_price_last_sent: Dict[str, tuple] = {}
         self._sec_def_last_sent: Dict[str, tuple] = {}
         self._exp_price_last_sent: Dict[str, tuple] = {}
+        self._reconnect_fail_streak: int = 0
 
     def _ws_stream_suffix(self) -> str:
         """Hậu tố tên kênh theo encoding — openapi-sdk dùng ``.msgpack`` khi encoding=msgpack."""
@@ -392,6 +393,70 @@ class TradingClient:
                 if str(item.get("status") or "").lower() == "error":
                     raise _AuthErr(f"Reconnect auth failed: {item}")
         raise _AuthErr("Reconnect auth: no auth_success within read budget")
+
+    @staticmethod
+    def _is_recoverable_connection_loss(exc: BaseException) -> bool:
+        from .exceptions import ConnectionClosed, ConnectionError as WsConnectionError
+
+        if isinstance(exc, ConnectionClosed):
+            return bool(getattr(exc, "recoverable", False))
+        if isinstance(exc, WsConnectionError):
+            return True
+        msg = str(exc).lower()
+        if "not connected" in msg or "connection closed" in msg or "connection reset" in msg:
+            return True
+        return isinstance(exc, (ConnectionResetError, BrokenPipeError))
+
+    async def _attempt_reconnect(self) -> bool:
+        """Reconnect + auth + replay subscriptions. Does not touch trading logic."""
+        streak = self._reconnect_fail_streak + 1
+        logger.warning(
+            "Connection lost, attempting reconnect (streak=%s)...",
+            streak,
+        )
+        try:
+            # Fresh socket + full retry budget (DNS blips often need >10 attempts).
+            await self._connection.connect(max_attempts=max(self._connection.max_retries, 20))
+            welcome_raw = await self._connection.receive()
+            self._raw_recv_count += 1
+            self._log_raw_frame("RAW_WS(reconnect_welcome)", welcome_raw)
+            welcome = self._decoder.decode(welcome_raw)
+            self._session_id = welcome.get("session_id") or welcome.get("SessionId")
+            auth_msg = self._auth.create_auth_message()
+            await self._send_dict(auth_msg, "AUTH(reconnect)")
+            await self._read_until_reconnect_auth_success()
+            self._tick_last_sent = {}
+            self._top_price_last_sent = {}
+            self._sec_def_last_sent = {}
+            self._exp_price_last_sent = {}
+            logger.info("Reconnected successfully")
+            self._reconnect_fail_streak = 0
+            try:
+                await self._replay_all_subscriptions()
+            except Exception as sub_ex:
+                logger.error(f"Re-subscribe after reconnect failed: {sub_ex}", exc_info=True)
+                print(
+                    f"[dnse-ws] Re-subscribe failed: {sub_ex}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+            return True
+        except Exception as re:
+            self._reconnect_fail_streak += 1
+            logger.error(f"Reconnect failed: {re}", exc_info=True)
+            print(f"[dnse-ws] Reconnect failed: {re}", file=sys.stderr, flush=True)
+            return False
+
+    async def _reconnect_backoff_sleep(self) -> None:
+        """Backoff after failed reconnect so we do not spin on 'Not connected'."""
+        streak = max(1, self._reconnect_fail_streak)
+        delay = min(5.0 * (2 ** min(streak - 1, 6)), 180.0)
+        logger.warning(
+            "Reconnect backoff %.0fs before next attempt (streak=%s)",
+            delay,
+            streak,
+        )
+        await asyncio.sleep(delay)
 
     async def _on_auth_success_maybe_replay(self) -> None:
         """Sau auth_success, gửi lại subscription (an toàn khi frame lẻ không qua handshake reconnect)."""
@@ -689,7 +754,7 @@ class TradingClient:
 
     async def _listen_loop(self) -> None:
         """Background task that receives and dispatches messages."""
-        from .exceptions import ConnectionClosed
+        from .exceptions import ConnectionClosed, ConnectionError as WsConnectionError
 
         while self._running:
             try:
@@ -759,44 +824,32 @@ class TradingClient:
                     continue
                 self._dispatch(decoded)
             except ConnectionClosed as e:
-                if e.recoverable and self._running:
-                    logger.warning("Connection lost, attempting reconnect...")
-                    try:
-                        await self._connection.connect()
-                        welcome_raw = await self._connection.receive()
-                        self._raw_recv_count += 1
-                        self._log_raw_frame("RAW_WS(reconnect_welcome)", welcome_raw)
-                        welcome = self._decoder.decode(welcome_raw)
-                        self._session_id = welcome.get("session_id") or welcome.get("SessionId")
-                        auth_msg = self._auth.create_auth_message()
-                        await self._send_dict(auth_msg, "AUTH(reconnect)")
-                        await self._read_until_reconnect_auth_success()
-                        self._tick_last_sent = {}
-                        self._top_price_last_sent = {}
-                        self._sec_def_last_sent = {}
-                        self._exp_price_last_sent = {}
-                        logger.info("Reconnected successfully")
-                        try:
-                            await self._replay_all_subscriptions()
-                        except Exception as sub_ex:
-                            logger.error(f"Re-subscribe after reconnect failed: {sub_ex}", exc_info=True)
-                            print(
-                                f"[dnse-ws] Re-subscribe failed: {sub_ex}",
-                                file=sys.stderr,
-                                flush=True,
-                            )
-                    except Exception as re:
-                        logger.error(f"Reconnect failed: {re}")
-                        await asyncio.sleep(5)
+                if self._running and self._is_recoverable_connection_loss(e):
+                    if not await self._attempt_reconnect():
+                        await self._reconnect_backoff_sleep()
+                else:
+                    break
+            except WsConnectionError as e:
+                if self._running:
+                    if not await self._attempt_reconnect():
+                        await self._reconnect_backoff_sleep()
                 else:
                     break
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                err = f"Error in listen loop: {e}"
-                logger.error(err, exc_info=True)
-                print(f"[dnse-ws] {err}", file=sys.stderr, flush=True)
-                await asyncio.sleep(1)
+                if self._running and self._is_recoverable_connection_loss(e):
+                    logger.warning(
+                        "Listen loop connection loss (%s), attempting reconnect...",
+                        e,
+                    )
+                    if not await self._attempt_reconnect():
+                        await self._reconnect_backoff_sleep()
+                else:
+                    err = f"Error in listen loop: {e}"
+                    logger.error(err, exc_info=True)
+                    print(f"[dnse-ws] {err}", file=sys.stderr, flush=True)
+                    await asyncio.sleep(1)
 
     def _dispatch(self, message: dict) -> None:
         """Route incoming message to the correct callback."""

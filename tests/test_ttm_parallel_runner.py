@@ -13,8 +13,11 @@ from src.strategies.ttm.config import TTM_CONFIG
 from src.strategies.ttm.ttm_parallel_runner import (
     ParallelRunner,
     _V2_CLOSED_TRADE_FLAT_DEFAULTS,
+    _v2_entry_confirm_row,
+    _v2_entry_execution_long_confirm,
     replay_bars,
 )
+from src.strategies.ttm.ttm_v2_gates import GATE_MODE_QUALITY_RESEARCH, entry_confirm_mode_for_gate
 
 
 def _bars(n: int = 80) -> list[OhlcBar]:
@@ -146,6 +149,49 @@ def test_v2_exit_trade_rows_include_entry_trace_fields(tmp_path: Path) -> None:
             assert k in o
         assert o["signal_bar_index"] == int(o["entry_bar_index"]) - 1
         assert o["holding_bars"] == o.get("holding_period")
+
+
+def test_v2_entry_confirm_row_uses_signal_bar_not_execution() -> None:
+    """Execution confirm must not read the closed N+1 feature row (lookahead)."""
+    feats = {
+        "n": 3,
+        "exhaustion_confirm": [False, False, True],
+        "last_bar_return": [0.0, -0.002, 0.01],
+        "breakout_up": [False, False, False],
+        "breakout_up_filtered_last": [False, False, False],
+    }
+    exec_row = {"exhaustion_confirm": True, "last_bar_return": 0.01}
+    sig_row, src, bi = _v2_entry_confirm_row(feats, exec_row, signal_bar_index=1)
+    assert src == "signal_bar"
+    assert bi == 1
+    assert sig_row.get("exhaustion_confirm") is False
+
+    cfg = {
+        **TTM_CONFIG,
+        "ttm_v2_enable_entry_confirmation": True,
+        "ttm_v2_gate_mode": GATE_MODE_QUALITY_RESEARCH,
+    }
+    blocked_exec, reason_exec, _ = _v2_entry_execution_long_confirm(
+        feats,
+        exec_row,
+        cfg,
+        signal_only_exec=False,
+        signal_long_candidate=True,
+        entry_confirm_mode=entry_confirm_mode_for_gate(GATE_MODE_QUALITY_RESEARCH),
+        signal_bar_index=None,
+    )
+    blocked_sig, reason_sig, fields_sig = _v2_entry_execution_long_confirm(
+        feats,
+        exec_row,
+        cfg,
+        signal_only_exec=False,
+        signal_long_candidate=True,
+        entry_confirm_mode=entry_confirm_mode_for_gate(GATE_MODE_QUALITY_RESEARCH),
+        signal_bar_index=1,
+    )
+    assert blocked_exec and "exhaustion" in reason_exec
+    assert not blocked_sig
+    assert fields_sig.get("confirm_data_source") == "signal_bar"
 
 
 def test_parallel_runner_deterministic() -> None:

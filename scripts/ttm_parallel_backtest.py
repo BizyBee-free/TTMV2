@@ -30,7 +30,20 @@ from src.backtest.data_fetcher import DataFetcher, OhlcBar
 from src.config import get_settings
 from src.hmm.basis_data import fetch_aligned_future_index
 from src.hmm.oi_data import OICache, align_open_interest_to_bars
-from src.strategies.ttm.ttm_parallel_runner import build_ttm_paper_live_config, replay_bars
+from src.strategies.ttm.empirical.adaptive_engine import EmpiricalAlphaEngine
+from src.strategies.ttm.ttm_features import compute_ttm_features_from_config
+from src.strategies.ttm.ttm_parallel_runner import (
+    ParallelRunner,
+    build_ttm_paper_live_config,
+    build_ttm_research_parallel_config,
+)
+from src.strategies.ttm.ttm_v2_gates import (
+    GATE_MODE_EXPLORATORY_RESEARCH,
+    GATE_MODE_QUALITY_RESEARCH,
+    GATE_MODE_RESEARCH_PAPER,
+    GATE_MODE_SHADOW_ONLY,
+    GATE_MODE_STRICT,
+)
 
 
 def _oi_cache_path(symbol: str) -> Path:
@@ -120,6 +133,19 @@ def load_bars_basis_oi(
     return bars, basis, oi
 
 
+def resolution_bar_seconds(resolution: str) -> int:
+    """DNSE resolution string -> bar length in seconds (aligns holding_period with wall clock)."""
+    key = str(resolution or "15").strip().upper()
+    return {
+        "1": 60,
+        "5": 300,
+        "15": 900,
+        "30": 1800,
+        "60": 3600,
+        "1D": 86400,
+    }.get(key, 900)
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Backtest TTM parallel V1+V2 trên OHLC lịch sử")
     p.add_argument("--symbol", default="VN30F1M")
@@ -128,6 +154,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--resolution", default="15", help="DNSE: 1,5,15,30,60,1D")
     p.add_argument("--no-cache", action="store_true", help="Không đọc/ghi cache OHLC (gọi API mỗi lần)")
     p.add_argument("--out-dir", default=None, help="Mặc định: reports/")
+    p.add_argument(
+        "--gate-mode",
+        default="quality_research",
+        choices=(
+            GATE_MODE_STRICT,
+            GATE_MODE_QUALITY_RESEARCH,
+            GATE_MODE_EXPLORATORY_RESEARCH,
+            GATE_MODE_RESEARCH_PAPER,
+            GATE_MODE_SHADOW_ONLY,
+        ),
+        help="TTM V2 gate mode (default: quality_research for paper/backtest preset)",
+    )
     return p.parse_args()
 
 
@@ -165,17 +203,8 @@ def main() -> int:
 
     basis_list = basis.tolist()
     oi_list = oi.tolist()
-    data_series: List[dict] = []
-    timestamps: List[str] = []
-    for i in range(n):
-        data_series.append(
-            {
-                "bars": bars[: i + 1],
-                "basis": basis_list[: i + 1],
-                "open_interest": oi_list[: i + 1],
-            }
-        )
-        timestamps.append(str(bars[i].unix_ts))
+    timestamps = [str(bars[i].unix_ts) for i in range(n)]
+    full_raw = {"bars": bars, "basis": basis_list, "open_interest": oi_list}
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
     safe_sym = "".join(c if c.isalnum() or c in "._-" else "_" for c in args.symbol)
@@ -184,14 +213,55 @@ def main() -> int:
     dec_path = out_dir / f"ttm_parallel_backtest_{safe_sym}_{args.from_date}_{args.to_date}_{stamp}_decisions.jsonl"
     trd_path = out_dir / f"ttm_parallel_backtest_{safe_sym}_{args.from_date}_{args.to_date}_{stamp}_trades.jsonl"
 
-    cfg = build_ttm_paper_live_config()
-    summary = replay_bars(
-        data_series,
-        config=cfg,
-        timestamps=timestamps,
+    if args.gate_mode == GATE_MODE_STRICT:
+        cfg = build_ttm_research_parallel_config(
+            {
+                "ttm_v2_gate_mode": GATE_MODE_STRICT,
+                "ttm_v2_allow_signal_only_long_execution": False,
+            }
+        )
+        print(f"[TTM parallel BT] gate_mode={GATE_MODE_STRICT}", flush=True)
+    elif args.gate_mode == GATE_MODE_SHADOW_ONLY:
+        cfg = build_ttm_research_parallel_config(
+            {
+                "ttm_v2_gate_mode": GATE_MODE_SHADOW_ONLY,
+                "ttm_v2_allow_signal_only_long_execution": True,
+            }
+        )
+        print(f"[TTM parallel BT] gate_mode={GATE_MODE_SHADOW_ONLY}", flush=True)
+    else:
+        gm = GATE_MODE_QUALITY_RESEARCH if args.gate_mode == GATE_MODE_RESEARCH_PAPER else args.gate_mode
+        cfg = build_ttm_paper_live_config({"ttm_v2_gate_mode": gm})
+        print(f"[TTM parallel BT] gate_mode={gm}", flush=True)
+    bar_sec = resolution_bar_seconds(args.resolution)
+    cfg["ttm_execution_bar_seconds"] = int(bar_sec)
+    print(f"[TTM parallel BT] bar_seconds={bar_sec}", flush=True)
+    print("[TTM parallel BT] Precomputing features (one pass)...", flush=True)
+    full_feats = compute_ttm_features_from_config(full_raw, cfg)
+    empirical_engine = None
+    if bool(cfg.get("ttm_v2_empirical_alpha_enabled", False)):
+        empirical_engine = EmpiricalAlphaEngine(cfg)
+    runner = ParallelRunner(
+        cfg,
         decision_log_path=str(dec_path),
         trade_log_path=str(trd_path),
+        execution_bar_seconds=bar_sec,
+        empirical_engine=empirical_engine,
     )
+    progress_every = max(500, n // 20)
+    for i in range(n):
+        if i > 0 and i % progress_every == 0:
+            print(f"[TTM parallel BT] replay {i}/{n} bars...", flush=True)
+        runner.on_new_bar(
+            i,
+            timestamps[i],
+            {
+                **full_raw,
+                "precomputed_feats": full_feats,
+                "feat_bar_index": i,
+            },
+        )
+    summary = runner.close()
 
     meta_path = out_dir / f"ttm_parallel_backtest_{safe_sym}_{args.from_date}_{args.to_date}_{stamp}_summary.json"
     meta = {

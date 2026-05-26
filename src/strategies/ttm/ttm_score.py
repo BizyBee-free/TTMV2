@@ -246,6 +246,7 @@ def compute_score_v2_alpha(
     if v3_diag is not None:
         long_comp_diag: Dict[str, Any] = {
             "crowd_phase": str(v3_diag["crowd_phase"]),
+            "phase_reason": str(v3_diag.get("phase_reason") or ""),
             "continuation_confirm": float(v3_diag["continuation_confirm"]),
             "score_long": float(v3_diag["score_long"]),
             "positive_last_bar_return": float(v3_diag["positive_last_bar_return"]),
@@ -257,6 +258,7 @@ def compute_score_v2_alpha(
         lb_ = float(last.get("last_bar_return") or 0.0)
         long_comp_diag = {
             "crowd_phase": str(classify_crowd_phase(last, config)),
+            "phase_reason": "legacy_classifier",
             "continuation_confirm": float(np.tanh(mom_ / 2.0)),
             "score_long": float(score_long),
             "positive_last_bar_return": float(max(0.0, np.tanh(lb_ * 6.0))),
@@ -281,6 +283,7 @@ def compute_score_v2_alpha(
                 sl_j = float(v3j["score_long"]) if valid_j else 0.0
                 lcj: Dict[str, Any] = {
                     "crowd_phase": str(v3j["crowd_phase"]),
+                    "phase_reason": str(v3j.get("phase_reason") or ""),
                     "continuation_confirm": float(v3j["continuation_confirm"]),
                     "score_long": sl_j,
                     "positive_last_bar_return": float(v3j["positive_last_bar_return"]),
@@ -292,6 +295,7 @@ def compute_score_v2_alpha(
                 lb_j = float(row_j.get("last_bar_return") or 0.0)
                 lcj = {
                     "crowd_phase": str(classify_crowd_phase(row_j, config)),
+                    "phase_reason": "legacy_classifier",
                     "continuation_confirm": float(np.tanh(mom_j / 2.0)),
                     "score_long": float(np.tanh(float(row_j.get("effective_strength") or 0.0)))
                     if bool(row_j.get("breakout_up"))
@@ -359,6 +363,7 @@ def compute_score_v2_alpha(
     }
     if v3_diag is not None:
         components["crowd_phase"] = str(v3_diag["crowd_phase"])
+        components["phase_reason"] = str(v3_diag.get("phase_reason") or "")
         components["late_fomo_flag"] = bool(v3_diag["late_fomo_flag"])
         er = v3_diag.get("entry_block_reason")
         components["entry_block_reason"] = er
@@ -375,6 +380,7 @@ def compute_score_v2_alpha(
         ):
             components[_k] = float(v3_diag[_k])
         components["effective_strength_v3_raw"] = float(v3_diag["effective_strength_raw"])
+        components["effective_strength_v3"] = float(v3_diag["effective_strength"])
     if short_diag is not None:
         for _sk, _sv in short_diag.items():
             if str(_sk).startswith("_") or _sk == "short_score":

@@ -34,6 +34,7 @@ Environment:
 TTM + song song V1/V2 (mặc định bật):
     STRATEGY_ALGO=TTM
     DNSE_WS_BOARD_ID=G1      (TTM phái sinh; MCMC/ws_test cổ phiếu có thể G1,AL)
+    V2 gates: build_ttm_paper_live_config() → quality_research trades; exploratory tier shadow in JSONL gate_diagnostics.
     Mỗi nến: REST bổ sung basis (future−index, HMM_INDEX_SYMBOL) + OI (secdef) như ttm_live — cần API key hợp lệ.
     Ghi JSONL: reports/ttm_parallel_decisions_<symbol>_<stamp>.jsonl và ..._trades_...
     Tắt:  --no-ttm-parallel
@@ -417,6 +418,8 @@ async def run_session(args: argparse.Namespace) -> None:
             logger.info(
                 "TTM parallel V1+V2 logging enabled",
                 extra={
+                    "ttm_config_profile": ttm_cfg.get("ttm_config_profile"),
+                    "ttm_v2_gate_mode": ttm_cfg.get("ttm_v2_gate_mode"),
                     "decisions_jsonl": str(dec_path),
                     "trades_jsonl": str(trd_path),
                     "jsonl_validation": (
@@ -428,6 +431,9 @@ async def run_session(args: argparse.Namespace) -> None:
             )
             print(
                 f"\n[TTM] Song song V1+V2 -> JSONL:\n  {dec_path}\n  {trd_path}\n"
+                f"  profile={ttm_cfg.get('ttm_config_profile')} "
+                f"gate_mode={ttm_cfg.get('ttm_v2_gate_mode')} "
+                f"(exploratory tier shadow in gate_diagnostics only)\n"
                 f"  (khi thoát phiên: closes_<symbol>_<stamp>.json cùng thư mục — dùng --closes cho ttm_validation)\n"
             )
             if args.debug_feed:

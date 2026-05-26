@@ -22,11 +22,11 @@ def _fin(x: Any, default: float = 0.0) -> float:
 
 
 def _last_prior_breakout_bar(feats: Mapping[str, Any], bi: int, lookback: int) -> Optional[int]:
-    """Last bar index <= bi with tradable or raw upside breakout in lookback window."""
+    """Last bar index strictly before ``bi`` with tradable or raw upside breakout in lookback window."""
     start = max(0, int(bi) - max(1, int(lookback)) + 1)
     bu_f = feats.get("breakout_up")
     bu_r = feats.get("breakout_up_raw")
-    for j in range(int(bi), start - 1, -1):
+    for j in range(int(bi) - 1, start - 1, -1):
         if isinstance(bu_f, np.ndarray) and j < bu_f.size and bool(bu_f[j]):
             return int(j)
         if isinstance(bu_r, np.ndarray) and j < bu_r.size and bool(bu_r[j]):
@@ -48,7 +48,11 @@ def compute_short_opportunity_v3(
     """
     bi = int(bar_index)
     lookback = max(5, int(config.get("ttm_v2_short_prior_breakout_lookback", 40)))
+    max_ctx = max(1, int(config.get("ttm_v2_bars_since_breakout_max_for_short", 20)))
     last_j = _last_prior_breakout_bar(feats, bi, lookback)
+    persisted_score = None
+    persisted_phase = None
+    persisted_extension = None
     if last_j is None and isinstance(last, Mapping):
         p_ix = last.get("ttm_v2_persist_last_upside_breakout_bar_index")
         if p_ix is not None:
@@ -56,8 +60,11 @@ def compute_short_opportunity_v3(
                 pi = int(p_ix)
             except (TypeError, ValueError):
                 pi = None
-            if pi is not None and 0 <= pi <= bi and (bi - pi) <= lookback:
+            if pi is not None and 0 <= pi < bi and (bi - pi) <= max_ctx:
                 last_j = pi
+                persisted_score = last.get("ttm_v2_persist_last_upside_breakout_score")
+                persisted_phase = last.get("ttm_v2_persist_last_upside_breakout_phase")
+                persisted_extension = last.get("ttm_v2_persist_last_upside_breakout_extension")
     prior_upside_breakout_exists = last_j is not None
     last_upside_breakout_bar_index = int(last_j) if last_j is not None else None
     bars_since_upside_breakout = int(bi - last_j) if last_j is not None else None
@@ -239,6 +246,9 @@ def compute_short_opportunity_v3(
         "short_block_reason": short_block_reason,
         "prior_upside_breakout_exists": bool(prior_upside_breakout_exists),
         "last_upside_breakout_bar_index": last_upside_breakout_bar_index,
+        "last_upside_breakout_score": persisted_score,
+        "last_upside_breakout_phase": persisted_phase,
+        "last_upside_breakout_extension": persisted_extension,
         "bars_since_upside_breakout": bars_since_upside_breakout,
         "crowded_long_pressure": float(crowded_long_pressure),
         "continuation_decay": float(continuation_decay),

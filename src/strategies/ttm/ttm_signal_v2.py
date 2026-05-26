@@ -16,6 +16,17 @@ from src.strategies.ttm.ttm_v2_exit_continuation import (
     decide_long_exit_continuation,
     decide_short_exit_continuation,
 )
+from src.strategies.ttm.ttm_v2_gates import (
+    ResearchGateSessionState,
+    build_gate_diagnostics,
+    entry_confirm_mode_for_gate,
+    is_research_gate_mode,
+    long_gate_for_trading,
+    resolve_gate_mode,
+    resolve_trading_gate_mode,
+    short_signal_for_trading,
+    valid_breakout_up,
+)
 from src.strategies.ttm.ttm_v2_phases import classify_crowd_phase, classify_short_phase
 from src.strategies.ttm.ttm_signal import (
     _emit_signal,
@@ -37,31 +48,17 @@ def _v2_eval_hard_long_gate(
     cfg_work: Mapping[str, Any],
     score_long: float,
 ) -> Tuple[bool, str]:
-    """
-    Refactor 20260511: LONG only when tradable breakout, early crowd phase, score above threshold,
-    and risk flags clear. Returns (allowed, block_reason_if_any).
-    """
-    thr_sl = float(cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0))
-    valid_breakout = bool(last.get("breakout_up_filtered_last", last.get("breakout_up")))
-    cp = str(components.get("crowd_phase") or classify_crowd_phase(last, cfg_work))
-    late_fomo = bool(components.get("late_fomo_flag"))
-    exhaustion = bool(last.get("exhaustion_confirm"))
-    failed_breakout = cp == "failed_breakout"
-    phase_ok = cp in ("ignition", "early_continuation")
-    score_ok = float(score_long) > float(thr_sl)
-    if float(score_long) <= float(thr_sl):
-        return False, "score_long_below_threshold"
-    if not valid_breakout:
-        return False, "long_gate_no_valid_breakout"
-    if not phase_ok:
-        return False, "long_gate_crowd_phase"
-    if late_fomo:
-        return False, "long_gate_late_fomo"
-    if exhaustion:
-        return False, "long_gate_exhaustion_confirm"
-    if failed_breakout:
-        return False, "long_gate_failed_breakout"
-    return True, ""
+    """Strict LONG gate (backward-compatible wrapper)."""
+    from src.strategies.ttm.ttm_v2_gates import GATE_MODE_STRICT, eval_long_gate
+
+    ok, reason = eval_long_gate(
+        last=last,
+        components=components,
+        cfg=cfg_work,
+        score_long=float(score_long),
+        mode=GATE_MODE_STRICT,
+    )
+    return ok, reason
 
 
 def _merge_ttm_config(config: Mapping[str, Any], adaptive: Optional[Any]) -> Dict[str, Any]:
@@ -102,6 +99,7 @@ def _top_component_names(components: Mapping[str, Any], n: int = 3) -> list[str]
         "short_effective_strength",
         "short_score_unit",
         "prior_upside_breakout_exists",
+        "phase_reason",
     )
     keys = [k for k in components if k not in skip]
     ranked = sorted(keys, key=lambda k: _abs_rankable(components.get(k, 0.0)), reverse=True)
@@ -112,6 +110,9 @@ def _pack_v2_short_components(components: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "prior_upside_breakout_exists": components.get("prior_upside_breakout_exists"),
         "last_upside_breakout_bar_index": components.get("last_upside_breakout_bar_index"),
+        "last_upside_breakout_score": components.get("last_upside_breakout_score"),
+        "last_upside_breakout_phase": components.get("last_upside_breakout_phase"),
+        "last_upside_breakout_extension": components.get("last_upside_breakout_extension"),
         "bars_since_upside_breakout": components.get("bars_since_upside_breakout"),
         "crowded_long_pressure": components.get("crowded_long_pressure"),
         "continuation_decay": components.get("continuation_decay"),
@@ -143,9 +144,10 @@ def _pack_v2_score_components(components: Mapping[str, Any]) -> Dict[str, Any]:
         "positive_last_bar_return": components.get("positive_last_bar_return"),
         "late_phase_penalty": components.get("late_phase_penalty"),
         "effective_strength_raw": eraw,
-        "effective_strength": components.get("effective_strength_last"),
+        "effective_strength": components.get("effective_strength_v3", components.get("effective_strength_last")),
         "score_long": components.get("score_long"),
         "crowd_phase": components.get("crowd_phase"),
+        "phase_reason": components.get("phase_reason"),
         "late_fomo_flag": components.get("late_fomo_flag"),
         "entry_block_reason": components.get("entry_block_reason"),
     }
@@ -205,6 +207,8 @@ def generate_ttm_signal_v2(
     entry_snapshot: Optional[Mapping[str, Any]] = None,
     position_meta: Optional[Mapping[str, Any]] = None,
     current_price: Optional[float] = None,
+    research_gate_state: Optional[ResearchGateSessionState] = None,
+    session_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Intraday alpha from :func:`~src.strategies.ttm.ttm_score.compute_score_v2_alpha` (breakout uses
@@ -288,15 +292,27 @@ def generate_ttm_signal_v2(
 
     last = features_last_row(feats)
     last = _merge_last_with_ohlc(last, feats)
+    bu_arr = feats.get("breakout_up")
+    if isinstance(bu_arr, np.ndarray) and n > 0:
+        last = dict(last)
+        last["breakout_up_filtered_last"] = bool(bu_arr[-1])
     xst = feats.get("ttm_v2_cross_bar_state") if isinstance(feats, dict) else None
     if isinstance(xst, dict):
         last = dict(last)
-        ix = xst.get("ttm_v2_persist_last_upside_breakout_bar_index")
+        for key in (
+            "ttm_v2_persist_last_upside_breakout_bar_index",
+            "ttm_v2_persist_last_upside_breakout_score",
+            "ttm_v2_persist_last_upside_breakout_phase",
+            "ttm_v2_persist_last_upside_breakout_extension",
+        ):
+            if key in xst:
+                last[key] = xst.get(key)
+        ix = last.get("ttm_v2_persist_last_upside_breakout_bar_index")
         if ix is not None:
             try:
                 last["ttm_v2_persist_last_upside_breakout_bar_index"] = int(ix)
             except (TypeError, ValueError):
-                pass
+                last.pop("ttm_v2_persist_last_upside_breakout_bar_index", None)
     vol_z = float(last.get("vol_z", last.get("vol_zscore", 0.0)) or 0.0)
     vol_z_thr = float(config.get("ttm_v2_vol_z_filter_threshold", -1.0))
 
@@ -389,17 +405,26 @@ def generate_ttm_signal_v2(
     short_score_last = _masked_last_optional(last, "short_score")
     enable_short = bool(cfg_work.get("ttm_v2_enable_short_trading", True))
     use_short_v3 = bool(cfg_work.get("ttm_v2_use_short_effective_strength_v3", False))
-    if use_short_v3:
-        short_signal = bool(
-            enable_short
-            and str(components.get("short_phase") or "") == "short_trigger"
-            and bool(components.get("short_candidate"))
-        )
-    else:
-        short_signal = bool(last.get("exhaustion_confirm"))
-    if not enable_short:
-        short_signal = False
-    long_signal = bool(last.get("breakout_up"))
+    short_phase_now = str(components.get("short_phase") or "")
+    short_score_now = float(components.get("short_score_unit", components.get("short_score", 0.0)) or 0.0)
+    short_entry_thr = float(cfg_work.get("ttm_v2_short_entry_threshold", 0.0))
+    short_chase_flag = bool(components.get("_short_chase_flag")) or short_phase_now == "short_chase_risk"
+    alive_cut = float(cfg_work.get("ttm_v2_short_continuation_recovery_threshold", 0.5))
+    early_alive = float(components.get("early_continuation_still_alive") or 0.0)
+    short_ok, _short_br = short_signal_for_trading(
+        components=components,
+        cfg=cfg_work,
+        short_phase=short_phase_now,
+        short_score=short_score_now,
+        short_chase_flag=short_chase_flag,
+        early_alive=early_alive,
+        enable_short=enable_short,
+        live_mode=live_mode,
+        session_state=research_gate_state,
+        bar_index=int(n - 1) if n > 0 else None,
+    )
+    short_signal = bool(short_ok)
+    long_signal = valid_breakout_up(last)
 
     def _debug_core() -> Dict[str, Any]:
         return {
@@ -432,6 +457,11 @@ def generate_ttm_signal_v2(
             "exhaustion_confirm": feat_pack.get("exhaustion_confirm"),
             "short_score": feat_pack.get("short_score"),
             "short_signal": short_signal,
+            "short_gate_reason": (
+                None
+                if short_signal
+                else (components.get("short_block_reason") or f"short_phase_{short_phase_now or 'unknown'}")
+            ),
             "long_signal": long_signal,
             "extension": feat_pack.get("extension"),
             "last_bar_return": feat_pack.get("last_bar_return"),
@@ -724,6 +754,36 @@ def generate_ttm_signal_v2(
         "v2_score_components": _pack_v2_score_components(components),
         "v2_short_components": _pack_v2_short_components(components),
     }
+    _bar_ix = int(n - 1) if n > 0 else None
+    if session_date is None and bar_timestamp is not None:
+        try:
+            from datetime import datetime, timezone, timedelta
+
+            dt = datetime.fromtimestamp(int(bar_timestamp), tz=timezone.utc) + timedelta(hours=7)
+            session_date = dt.strftime("%Y%m%d")
+        except (TypeError, ValueError, OSError):
+            session_date = None
+    _gate_diag = build_gate_diagnostics(
+        last=last,
+        components=components,
+        cfg=cfg_work,
+        score_long=float(sl),
+        short_phase=short_phase_now,
+        short_score=short_score_now,
+        short_chase_flag=short_chase_flag,
+        early_alive=early_alive,
+        prob_long=float(pl),
+        entry_threshold=float(entry_thr),
+        live_mode=live_mode,
+        bar_index=_bar_ix,
+        session_state=research_gate_state,
+        session_date=session_date,
+    )
+    debug_payload["gate_diagnostics"] = _gate_diag
+    debug_payload["v2_gate_diagnostics"] = _gate_diag
+    _gate_mode = resolve_gate_mode(cfg_work, live_mode=live_mode)
+    _trading_gate_mode = resolve_trading_gate_mode(cfg_work, live_mode=live_mode)
+    _research_long_entry = bool(_gate_diag.get("research_long_entry_allowed"))
     logger.info(
         "TTM V2 unified score",
         extra={
@@ -782,6 +842,9 @@ def generate_ttm_signal_v2(
             decision_entry = "SHORT"
         else:
             decision_entry = "NONE"
+    elif is_research_gate_mode(_trading_gate_mode) and not live_mode:
+        if _research_long_entry:
+            decision_entry = "LONG"
     elif long_signal and pl > entry_thr:
         decision_entry = "LONG"
     elif ps > entry_thr and short_signal:
@@ -794,11 +857,14 @@ def generate_ttm_signal_v2(
         print(f"FINAL DECISION: {decision_entry}", flush=True)
 
     if decision_entry == "LONG" and bool(cfg_work.get("ttm_v2_hard_long_gate_enabled", True)):
-        ok_gate, gate_reason = _v2_eval_hard_long_gate(
+        ok_gate, gate_reason, gate_lbl = long_gate_for_trading(
             last=last,
             components=components,
-            cfg_work=cfg_work,
+            cfg=cfg_work,
             score_long=float(sl),
+            live_mode=live_mode,
+            bar_index=_bar_ix,
+            session_state=research_gate_state,
         )
         if not ok_gate:
             return _log_hold(
@@ -808,9 +874,13 @@ def generate_ttm_signal_v2(
                     "ttm_v2_score_long_entry_threshold": float(
                         cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0)
                     ),
+                    "ttm_v2_research_score_long_floor": float(
+                        cfg_work.get("ttm_v2_research_score_long_floor", -0.30)
+                    ),
                     "crowd_phase": str(components.get("crowd_phase") or ""),
-                    "decision_source": "hard_long_gate",
+                    "decision_source": gate_lbl,
                     "long_gate_reason": gate_reason,
+                    "gate_mode": resolve_gate_mode(cfg_work, live_mode=live_mode),
                 },
             )
 
@@ -836,12 +906,16 @@ def generate_ttm_signal_v2(
                     {"late_fomo_flag": True, "decision_source": "late_fomo_gate"},
                 )
         if bool(cfg_work.get("ttm_v2_enable_entry_confirmation")):
-            thr_sl = float(cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0))
-            if float(sl) < thr_sl:
-                return _log_hold(
-                    "score_below_threshold",
-                    {"score_long": sl, "ttm_v2_score_long_entry_threshold": thr_sl},
-                )
+            _ecm_sig = entry_confirm_mode_for_gate(_gate_mode)
+            _entry_confirm_result = "pass"
+            _entry_confirm_block_reason = None
+            if _ecm_sig != "research":
+                thr_sl = float(cfg_work.get("ttm_v2_score_long_entry_threshold", 0.0))
+                if float(sl) < thr_sl:
+                    return _log_hold(
+                        "score_below_threshold",
+                        {"score_long": sl, "ttm_v2_score_long_entry_threshold": thr_sl},
+                    )
             if bool(last.get("exhaustion_confirm")):
                 return _log_hold("exhaustion_confirm_block", {})
             pos_lb = components.get("positive_last_bar_return")
@@ -857,16 +931,31 @@ def generate_ttm_signal_v2(
                     {"positive_last_bar_return": pos_lb, "threshold": float(lb_thr)},
                 )
             if bool(components.get("late_fomo_flag")):
-                return _log_hold("late_fomo_entry_confirm", {})
+                return _log_hold(
+                    "late_fomo_entry_confirm",
+                    {
+                        "entry_confirm_mode": _ecm_sig,
+                        "entry_confirm_result": "block",
+                        "entry_confirm_block_reason": "late_fomo_entry_confirm",
+                    },
+                )
+            debug_payload["entry_confirm_mode"] = _ecm_sig
+            debug_payload["entry_confirm_result"] = _entry_confirm_result
+            debug_payload["entry_confirm_block_reason"] = _entry_confirm_block_reason
 
-    if ok and decision_entry == "LONG" and pl <= entry_thr:
+    if ok and decision_entry == "LONG" and not is_research_gate_mode(_trading_gate_mode) and pl <= entry_thr:
         raise RuntimeError(
             "INCONSISTENT: LONG but prob_long not above threshold "
             f"(pl={pl}, thr={entry_thr})"
         )
-    if ok and decision_entry == "LONG" and not long_signal:
+    if ok and decision_entry == "LONG" and is_research_gate_mode(_trading_gate_mode) and not _research_long_entry:
         raise RuntimeError(
-            "INCONSISTENT: LONG while breakout_up is False "
+            "INCONSISTENT: research LONG without research_long_entry_allowed "
+            f"(pl={pl}, gate_mode={_trading_gate_mode})"
+        )
+    if ok and decision_entry == "LONG" and not is_research_gate_mode(_trading_gate_mode) and not long_signal:
+        raise RuntimeError(
+            "INCONSISTENT: strict LONG while breakout_up is False "
             f"(pl={pl}, breakout_up={long_signal})"
         )
     if ok and decision_entry == "SHORT" and ps <= entry_thr:
@@ -883,6 +972,35 @@ def generate_ttm_signal_v2(
 
     if decision_entry == "NONE":
         no_entry_reason = "below_entry_threshold"
+        if is_research_gate_mode(_trading_gate_mode) and not live_mode:
+            if bool(_gate_diag.get("blocked_by_hard_block")):
+                no_entry_reason = str(_gate_diag.get("hard_block_reason") or "hard_block_long")
+            elif bool(_gate_diag.get("quality_research_long_allowed")) or bool(
+                _gate_diag.get("exploratory_research_long_allowed")
+            ):
+                if bool(_gate_diag.get("blocked_by_prob_gate")):
+                    no_entry_reason = "blocked_by_prob_gate"
+                elif bool(_gate_diag.get("blocked_by_trade_cap")):
+                    no_entry_reason = str(
+                        _gate_diag.get("research_trade_cap_block_reason") or "blocked_by_trade_cap"
+                    )
+                elif bool(_gate_diag.get("long_candidate")):
+                    no_entry_reason = str(
+                        _gate_diag.get("quality_research_block_reason")
+                        or _gate_diag.get("exploratory_research_block_reason")
+                        or "research_tier_gate_block"
+                    )
+        blocked_short_phases = {
+            "no_short_context",
+            "crowded_long_watch",
+            "short_setup",
+            "short_chase_risk",
+            "short_invalid",
+        }
+        if short_phase_now in blocked_short_phases:
+            no_entry_reason = str(components.get("short_block_reason") or f"short_phase_{short_phase_now}")
+        elif enable_short and ps > entry_thr and not short_signal:
+            no_entry_reason = str(components.get("short_block_reason") or "short_gate_block")
         if short_signal and ps <= entry_thr:
             no_entry_reason = "short_below_entry_threshold"
         return _log_hold(
@@ -903,10 +1021,16 @@ def generate_ttm_signal_v2(
             breakout_align=bool(last.get("breakout_up")),
             cfg=cfg_work,
         )
+        _gm = resolve_gate_mode(cfg_work, live_mode=live_mode)
+        _long_reason = (
+            "research_softmax_entry_long"
+            if is_research_gate_mode(_gm)
+            else "softmax_entry_long"
+        )
         out = {
             "action": "LONG",
             "confidence": conf,
-            "reason": "softmax_entry_long",
+            "reason": _long_reason,
             "strategy": "TTM",
             "trap_score": float(sl),
             "features": feat_pack,
@@ -916,13 +1040,17 @@ def generate_ttm_signal_v2(
                 "decision_source": "threshold",
                 "entry_threshold": entry_thr,
                 "vol_confirm_applied": vol_conf_applied,
+                "gate_mode": _gm,
+                "research_gate_allowed": bool(_gate_diag.get("research_long_allowed")),
+                "research_entry_source": _gate_diag.get("research_entry_source"),
+                "research_prob_gate_bypassed": _gate_diag.get("research_prob_gate_bypassed"),
             },
         }
         tr_l = {
             "stage": "entry",
             "bar_index": n - 1,
             "action": "LONG",
-            "reason": "softmax_entry_long",
+            "reason": _long_reason,
             "model_version": "v2",
         }
         return _emit_signal(out, tr_l, print_trace)

@@ -30,12 +30,24 @@ from src.strategies.ttm.config import (
     build_ttm_research_parallel_config,
 )
 from src.strategies.ttm.ttm_alignment import fingerprint_aligned_tail
-from src.strategies.ttm.ttm_features import compute_ttm_features_from_config, features_last_row
+from src.strategies.ttm.ttm_features import (
+    compute_ttm_features_from_config,
+    features_last_row,
+    features_row_at,
+)
 from src.strategies.ttm.ttm_regime import detect_regime
 from src.strategies.ttm.ttm_signal import generate_ttm_signal_v1
 from src.strategies.ttm.empirical.adaptive_engine import EmpiricalAlphaEngine
 from src.strategies.ttm.ttm_score import compute_score_v2_alpha
 from src.strategies.ttm.ttm_signal_v2 import generate_ttm_signal_v2
+from src.strategies.ttm.ttm_v2_gates import (
+    ResearchGateSessionState,
+    entry_confirm_mode_for_gate,
+    eval_data_stale,
+    record_research_trade_if_applicable,
+    resolve_gate_mode,
+)
+from src.strategies.ttm.ttm_v2_phases import classify_crowd_phase
 from src.strategies.ttm.ttm_v2_exit_continuation import map_parallel_runner_reason_to_canonical
 from src.strategies.ttm.ttm_strategy import TTMDerivativesStrategy
 from src.strategies.ttm.ttm_v2_short import (
@@ -70,6 +82,14 @@ def _json_safe(obj: Any) -> Any:
     if isinstance(obj, (list, tuple)):
         return [_json_safe(v) for v in obj]
     return str(obj)
+
+
+def _finite_or_none(obj: Any) -> Optional[float]:
+    try:
+        v = float(obj)
+    except (TypeError, ValueError):
+        return None
+    return v if np.isfinite(v) else None
 
 
 def _v2_long_entry_calibration_from_features(feat: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
@@ -175,6 +195,17 @@ def _classify_v2_blocked(
         return "score_long_below_threshold"
     if "long_gate_" in r or r == "long_gate_block":
         return "long_gate"
+    if r in (
+        "no_prior_upside_breakout",
+        "long_continuation_early",
+        "short_chase_risk",
+        "rejection_not_confirmed",
+        "rejection_weak",
+        "insufficient_setup",
+        "below_trigger_threshold",
+        "long_continuation_recovered",
+    ) or r.startswith("short_phase_") or r.startswith("short_gate_"):
+        return r
     if "below_entry" in r or "threshold" in r or "weak" in r or "tie" in r:
         return "threshold"
     if "basis_filter" in r or "entry_require" in r:
@@ -200,6 +231,7 @@ _V2_SCORE_COMPONENTS_EMPTY: Dict[str, Any] = {
     "effective_strength": None,
     "score_long": None,
     "crowd_phase": None,
+    "phase_reason": None,
     "late_fomo_flag": None,
     "entry_block_reason": None,
 }
@@ -207,6 +239,9 @@ _V2_SCORE_COMPONENTS_EMPTY: Dict[str, Any] = {
 _V2_SHORT_COMPONENTS_EMPTY: Dict[str, Any] = {
     "prior_upside_breakout_exists": None,
     "last_upside_breakout_bar_index": None,
+    "last_upside_breakout_score": None,
+    "last_upside_breakout_phase": None,
+    "last_upside_breakout_extension": None,
     "bars_since_upside_breakout": None,
     "crowded_long_pressure": None,
     "continuation_decay": None,
@@ -270,12 +305,37 @@ def _v2_signal_bar_snapshot(sig_v2: Mapping[str, Any], feat: Mapping[str, Any]) 
     return {k: _json_safe(v) for k, v in out.items()}
 
 
+def _v2_entry_confirm_row(
+    feats: Mapping[str, Any],
+    execution_last_row: Mapping[str, Any],
+    *,
+    signal_bar_index: Optional[int] = None,
+) -> Tuple[Dict[str, Any], str, Optional[int]]:
+    """
+    Causal confirm row for signal@N → fill@N+1 backtest: use closed features at signal bar,
+    not the execution bar row (which includes the full N+1 candle — lookahead).
+    """
+    if signal_bar_index is not None:
+        try:
+            sbi = int(signal_bar_index)
+            n = int(feats.get("n", 0) or 0)
+            if 0 <= sbi < n:
+                return dict(features_row_at(dict(feats), sbi)), "signal_bar", sbi
+        except (TypeError, ValueError):
+            pass
+    return dict(execution_last_row), "execution_bar", None
+
+
 def _v2_entry_execution_long_confirm(
     feats: Mapping[str, Any],
     last_row: Mapping[str, Any],
     config: Mapping[str, Any],
     *,
     signal_only_exec: bool,
+    signal_crowd_phase: Optional[str] = None,
+    signal_long_candidate: bool = False,
+    entry_confirm_mode: str = "strict",
+    signal_bar_index: Optional[int] = None,
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
     At execution bar: optional block for LONG when confirmation enabled.
@@ -283,22 +343,61 @@ def _v2_entry_execution_long_confirm(
     """
     if not bool(config.get("ttm_v2_enable_entry_confirmation", False)):
         return False, "", {}
-    sl, _ss, comp = compute_score_v2_alpha(feats, last_row, config)
+    confirm_row, confirm_src, confirm_bi = _v2_entry_confirm_row(
+        feats, last_row, signal_bar_index=signal_bar_index
+    )
+    sl, _ss, comp = compute_score_v2_alpha(feats, confirm_row, config)
     cp = str(comp.get("crowd_phase") or "")
     thr = float(config.get("ttm_v2_score_long_entry_threshold", 0.0))
-    bad_phases = ("no_breakout", "late_fomo", "exhaustion", "failed_breakout")
-    bu_ok = bool(last_row.get("breakout_up_filtered_last", last_row.get("breakout_up")))
+    from src.strategies.ttm.ttm_v2_gates import research_score_long_floor
+
+    research_floor = research_score_long_floor(config)
+    bu_ok = bool(
+        confirm_row.get("breakout_up_filtered_last", confirm_row.get("breakout_up"))
+    )
+    sig_cp = str(signal_crowd_phase or "").strip().lower()
     fields: Dict[str, Any] = {
         "entry_confirm_score_long": float(sl),
         "entry_confirm_phase": cp,
         "entry_confirm_breakout_valid": bool(bu_ok),
+        "entry_confirm_mode": str(entry_confirm_mode),
+        "signal_crowd_phase": signal_crowd_phase,
+        "signal_long_candidate": bool(signal_long_candidate),
+        "confirm_data_source": confirm_src,
+        "confirm_bar_index": confirm_bi,
     }
+    mode_u = str(entry_confirm_mode or "strict").strip().lower()
+    if mode_u == "research":
+        if bool(confirm_row.get("exhaustion_confirm")) or cp == "exhaustion":
+            return True, "entry_confirm_exhaustion_confirm", fields
+        if bool(comp.get("late_fomo_flag")) or cp == "late_fomo":
+            return True, "entry_confirm_late_fomo_extreme", fields
+        adv_thr = float(config.get("ttm_v2_research_entry_hard_adverse_return", -0.0015))
+        try:
+            lbv = float(confirm_row.get("last_bar_return") or 0.0)
+        except (TypeError, ValueError):
+            lbv = 0.0
+        if lbv < adv_thr:
+            return True, "entry_confirm_hard_adverse_move", fields
+        if bool(comp.get("failed_breakout_confirm")) or str(comp.get("crowd_phase") or "") == "failed_breakout":
+            return True, "entry_confirm_failed_breakout", fields
+        if eval_data_stale(confirm_row, comp):
+            return True, "entry_confirm_data_stale", fields
+        if not bu_ok and not signal_only_exec and not signal_long_candidate:
+            if sig_cp not in ("ignition", "early_continuation"):
+                return True, "entry_confirm_no_breakout_at_fill", fields
+        fields["entry_confirm_result"] = "pass"
+        fields["entry_confirm_block_reason"] = None
+        return False, "", fields
+    bad_phases = ("no_breakout", "late_fomo", "exhaustion", "failed_breakout")
     if cp in bad_phases:
         return True, "entry_confirm_bad_phase", fields
     if float(sl) <= float(thr):
         return True, "entry_confirm_score_below_threshold", fields
     if not bu_ok and not signal_only_exec:
         return True, "entry_confirm_no_breakout_at_fill", fields
+    fields["entry_confirm_result"] = "pass"
+    fields["entry_confirm_block_reason"] = None
     return False, "", fields
 
 
@@ -464,6 +563,7 @@ def _build_v2_block(
         "blocked_by": blocked_by,
         "score_components": _merge_v2_score_components_log(dbg),
         "short_components": _merge_v2_short_components_log(dbg),
+        "gate_diagnostics": _json_safe(dbg.get("gate_diagnostics") or dbg.get("v2_gate_diagnostics")),
         "log": {
             "decision_source": dbg.get("decision_source", "threshold"),
             "threshold": _json_safe(dbg.get("entry_threshold", entry_thr)),
@@ -471,6 +571,7 @@ def _build_v2_block(
             "ttm_config_profile": dbg.get("ttm_config_profile"),
             "crowd_phase": dbg.get("crowd_phase"),
             "short_phase": dbg.get("short_phase"),
+            "gate_mode": dbg.get("gate_mode") or (dbg.get("gate_diagnostics") or {}).get("gate_mode"),
         },
     }
 
@@ -749,6 +850,12 @@ class ParallelRunner:
     _last_feat_row: Optional[Dict[str, Any]] = field(default=None, init=False)
     # Last bar index with upside breakout / early crowd context (for SHORT diagnostics persistence).
     _v2_last_upside_breakout_bar_index: Optional[int] = field(default=None, init=False)
+    _v2_last_upside_breakout_score: Optional[float] = field(default=None, init=False)
+    _v2_last_upside_breakout_phase: Optional[str] = field(default=None, init=False)
+    _v2_last_upside_breakout_extension: Optional[float] = field(default=None, init=False)
+    _research_gate_state: ResearchGateSessionState = field(
+        default_factory=ResearchGateSessionState, init=False
+    )
 
     def __post_init__(self) -> None:
         if self.decision_log_path:
@@ -877,10 +984,35 @@ class ParallelRunner:
             flush=True,
         )
 
+    @staticmethod
+    def _truncate_feats(feats: Mapping[str, Any], bar_index: int) -> Dict[str, Any]:
+        """Causal prefix of precomputed feature arrays (for O(n) backtest replay)."""
+        n_full = int(feats.get("n", 0) or 0)
+        n = min(n_full, int(bar_index) + 1)
+        if n <= 0:
+            return {"n": 0}
+        out: Dict[str, Any] = {"n": n}
+        for k, v in feats.items():
+            if k == "n":
+                continue
+            if isinstance(v, np.ndarray) and v.size >= n:
+                out[k] = v[:n]
+            else:
+                out[k] = v
+        return out
+
     def _compute_feats(self, data: Mapping[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         raw = dict(data)
         if "bars" not in raw or raw.get("bars") is None:
             return {}, {}
+        pc = raw.get("precomputed_feats")
+        if isinstance(pc, Mapping):
+            bi = raw.get("feat_bar_index")
+            if bi is None:
+                bi = max(0, int(pc.get("n", 0)) - 1)
+            feats = self._truncate_feats(pc, int(bi))
+            last = features_last_row(feats) if int(feats.get("n", 0)) > 0 else {}
+            return feats, last
         feats = compute_ttm_features_from_config(raw, self.config)
         last = features_last_row(feats) if int(feats.get("n", 0)) > 0 else {}
         return feats, last
@@ -996,14 +1128,32 @@ class ParallelRunner:
         self._last_bars = list(data.get("bars") or [])
         feats, last = self._compute_feats(data)
         feats_v2: Mapping[str, Any] = feats
-        if isinstance(feats, dict):
+        if isinstance(feats, dict) and last:
             feats_v2 = dict(feats)
+            cp_anchor = str(classify_crowd_phase(last, self.config))
+            bu_anchor = bool(last.get("breakout_up_filtered_last", last.get("breakout_up")))
+            if bu_anchor or cp_anchor in ("ignition", "early_continuation"):
+                self._v2_last_upside_breakout_bar_index = int(bar_index)
+                self._v2_last_upside_breakout_phase = cp_anchor
+                self._v2_last_upside_breakout_extension = _finite_or_none(last.get("extension"))
+            max_short_ctx = max(1, int(self.config.get("ttm_v2_bars_since_breakout_max_for_short", 20)))
             if self._v2_last_upside_breakout_bar_index is not None:
-                feats_v2["ttm_v2_cross_bar_state"] = {
-                    "ttm_v2_persist_last_upside_breakout_bar_index": int(
-                        self._v2_last_upside_breakout_bar_index
-                    ),
-                }
+                age = int(bar_index) - int(self._v2_last_upside_breakout_bar_index)
+                if 0 <= age <= max_short_ctx:
+                    feats_v2["ttm_v2_cross_bar_state"] = {
+                        "ttm_v2_persist_last_upside_breakout_bar_index": int(
+                            self._v2_last_upside_breakout_bar_index
+                        ),
+                        "ttm_v2_persist_last_upside_breakout_score": _json_safe(
+                            self._v2_last_upside_breakout_score
+                        ),
+                        "ttm_v2_persist_last_upside_breakout_phase": _json_safe(
+                            self._v2_last_upside_breakout_phase
+                        ),
+                        "ttm_v2_persist_last_upside_breakout_extension": _json_safe(
+                            self._v2_last_upside_breakout_extension
+                        ),
+                    }
         n = int(feats.get("n", 0))
 
         if close_price is None and n > 0:
@@ -1147,11 +1297,21 @@ class ParallelRunner:
             _ts_int = int(timestamp) if str(timestamp).isdigit() else None
         except (TypeError, ValueError):
             _ts_int = None
+        _live_mode = str(self.config.get("ttm_config_profile", "") or "") == "live_adaptive"
+        _session_date = None
+        try:
+            if str(timestamp).isdigit():
+                from datetime import datetime, timezone, timedelta
+
+                dt = datetime.fromtimestamp(int(timestamp), tz=timezone.utc) + timedelta(hours=7)
+                _session_date = dt.strftime("%Y%m%d")
+        except (TypeError, ValueError, OSError):
+            _session_date = None
         sig_v2 = generate_ttm_signal_v2(
             feats_v2,
             self.config,
             position_side=side_v2,
-            live_mode=False,
+            live_mode=_live_mode,
             adaptive=self.adaptive_context,
             empirical_engine=self.empirical_engine,
             bar_timestamp=_ts_int,
@@ -1160,6 +1320,8 @@ class ParallelRunner:
             entry_snapshot=pos_v2.entry_v2_meta if pos_v2.is_open else None,
             position_meta=pos_v2.paper_exec_meta if pos_v2.is_open else None,
             current_price=float(price_ref) if price_ref > 0 else None,
+            research_gate_state=self._research_gate_state,
+            session_date=_session_date,
         )
 
         _dbg2_pre = sig_v2.get("debug") or {}
@@ -1188,6 +1350,13 @@ class ParallelRunner:
             or _scp in ("ignition", "early_continuation")
         ):
             self._v2_last_upside_breakout_bar_index = int(bar_index)
+            self._v2_last_upside_breakout_score = _finite_or_none(_dbgx.get("score_long"))
+            self._v2_last_upside_breakout_phase = _scp or None
+            self._v2_last_upside_breakout_extension = _finite_or_none(_dbgx.get("extension"))
+        elif self._v2_last_upside_breakout_bar_index is not None:
+            self._v2_last_upside_breakout_score = _finite_or_none(
+                _dbgx.get("score_long") or self._v2_last_upside_breakout_score
+            )
 
         last_snap = _merge_features(last, data, feats=feats) if last else empty_features
         v1_struct = _build_v1_block(sig_v1, self.config, last)
@@ -1369,6 +1538,7 @@ class ParallelRunner:
         feats: Mapping[str, Any],
         last_row: Mapping[str, Any],
     ) -> None:
+        _live_mode = str(self.config.get("ttm_config_profile", "") or "") == "live_adaptive"
         a1 = str(sig_v1.get("action", "HOLD")).upper()
         a2 = str(sig_v2.get("action", "HOLD")).upper()
         bars = self._last_bars
@@ -1438,6 +1608,12 @@ class ParallelRunner:
                 blocked_open = False
                 blk_reason = ""
                 if str(side_pe).upper() == "LONG":
+                    _snap = pe2.get("signal_bar_snapshot") if isinstance(pe2.get("signal_bar_snapshot"), dict) else {}
+                    _sc = _snap.get("signal_score_components") if isinstance(_snap.get("signal_score_components"), dict) else {}
+                    _gd = _snap.get("gate_diagnostics") if isinstance(_snap.get("gate_diagnostics"), dict) else {}
+                    if not _gd and isinstance(psig.get("debug"), dict):
+                        _gd = (psig.get("debug") or {}).get("gate_diagnostics") or {}
+                    _ecm = entry_confirm_mode_for_gate(resolve_gate_mode(self.config, live_mode=_live_mode))
                     blocked_open, blk_reason, cfld = _v2_entry_execution_long_confirm(
                         feats,
                         last_row,
@@ -1445,6 +1621,10 @@ class ParallelRunner:
                         signal_only_exec=bool(
                             self.config.get("ttm_v2_allow_signal_only_long_execution", False)
                         ),
+                        signal_crowd_phase=str(_sc.get("crowd_phase") or _snap.get("signal_crowd_phase") or ""),
+                        signal_long_candidate=bool(_gd.get("long_candidate")),
+                        entry_confirm_mode=_ecm,
+                        signal_bar_index=pe2.get("signal_bar_index"),
                     )
                     snap_meta.update(cfld)
                     snap_meta["entry_blocked"] = bool(blocked_open)
@@ -1472,6 +1652,13 @@ class ParallelRunner:
                             else None
                         ),
                         entry_v2_meta=snap_meta,
+                    )
+                    record_research_trade_if_applicable(
+                        cfg=self.config,
+                        side=str(side_pe),
+                        bar_index=int(bar_index),
+                        session_state=self._research_gate_state,
+                        live_mode=_live_mode,
                     )
                     self._record_v2_follow_design(sig_v2, side_pe)
                     self._pending_entries["v2"] = {}
@@ -1502,6 +1689,12 @@ class ParallelRunner:
             blocked2 = False
             blk2 = ""
             if side_pe2.upper() == "LONG":
+                _snap2 = pe2.get("signal_bar_snapshot") if isinstance(pe2.get("signal_bar_snapshot"), dict) else {}
+                _sc2 = _snap2.get("signal_score_components") if isinstance(_snap2.get("signal_score_components"), dict) else {}
+                _gd2 = _snap2.get("gate_diagnostics") if isinstance(_snap2.get("gate_diagnostics"), dict) else {}
+                if not _gd2 and isinstance(psig2.get("debug"), dict):
+                    _gd2 = (psig2.get("debug") or {}).get("gate_diagnostics") or {}
+                _ecm2 = entry_confirm_mode_for_gate(resolve_gate_mode(self.config, live_mode=_live_mode))
                 blocked2, blk2, cf2 = _v2_entry_execution_long_confirm(
                     feats,
                     last_row,
@@ -1509,6 +1702,10 @@ class ParallelRunner:
                     signal_only_exec=bool(
                         self.config.get("ttm_v2_allow_signal_only_long_execution", False)
                     ),
+                    signal_crowd_phase=str(_sc2.get("crowd_phase") or _snap2.get("signal_crowd_phase") or ""),
+                    signal_long_candidate=bool(_gd2.get("long_candidate")),
+                    entry_confirm_mode=_ecm2,
+                    signal_bar_index=pe2.get("signal_bar_index"),
                 )
                 snap_meta2.update(cf2)
                 snap_meta2["entry_blocked"] = bool(blocked2)
@@ -1536,6 +1733,13 @@ class ParallelRunner:
                         else None
                     ),
                     entry_v2_meta=snap_meta2,
+                )
+                record_research_trade_if_applicable(
+                    cfg=self.config,
+                    side=str(side_pe2),
+                    bar_index=int(bar_index),
+                    session_state=self._research_gate_state,
+                    live_mode=_live_mode,
                 )
                 self._record_v2_follow_design(sig_v2, side_pe2)
                 self._pending_entries["v2"] = {}

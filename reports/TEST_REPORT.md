@@ -5546,6 +5546,39 @@ python scripts/backtest.py --suite all --no-fetch
 
 ---
 
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+
 ## Unit Tests -- TTM V2 LONG scoring purity [2026-04-23]
 
 **Ngày test:** 2026-04-23  
@@ -5678,6 +5711,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-21 16:06]
 
 ### Configuration
@@ -5718,6 +5784,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] TTM signals logged with strategy/action/confidence/reason
 - [ ] No overlapping entries when flat
 - [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
 
 ---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-22 15:06]
@@ -5762,6 +5861,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-23 15:02]
 
 ### Configuration
@@ -5804,6 +5936,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-23 19:40]
 
 ### Configuration
@@ -5838,6 +6003,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] TTM signals logged with strategy/action/confidence/reason
 - [ ] No overlapping entries when flat
 - [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
 
 ---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-24 15:05]
@@ -5882,6 +6080,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-28 09:16]
 
 ### Configuration
@@ -5922,6 +6153,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] TTM signals logged with strategy/action/confidence/reason
 - [ ] No overlapping entries when flat
 - [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
 
 ---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-28 14:57]
@@ -5966,6 +6230,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-29 09:38]
 
 ### Configuration
@@ -6006,6 +6303,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] TTM signals logged with strategy/action/confidence/reason
 - [ ] No overlapping entries when flat
 - [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
 
 ---
 ## Paper Test Session (TTM) -- VN30F1M [2026-04-29 15:03]
@@ -6050,6 +6380,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-05-04 15:24]
 
 ### Configuration
@@ -6090,6 +6453,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] TTM signals logged with strategy/action/confidence/reason
 - [ ] No overlapping entries when flat
 - [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
 
 ---
 ## Paper Test Session (TTM) -- VN30F1M [2026-05-05 14:50]
@@ -6134,6 +6530,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-05-06 14:55]
 
 ### Configuration
@@ -6174,6 +6603,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] TTM signals logged with strategy/action/confidence/reason
 - [ ] No overlapping entries when flat
 - [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
 
 ---
 ## Paper Test Session (TTM) -- VN30F1M [2026-05-07 14:53]
@@ -6218,6 +6680,39 @@ python scripts/backtest.py --suite all --no-fetch
 - [ ] Risk manager correctly gated orders
 
 ---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
 ## Paper Test Session (TTM) -- VN30F1M [2026-05-08 14:50]
 
 ### Configuration
@@ -6244,6 +6739,1548 @@ python scripts/backtest.py --suite all --no-fetch
 | Metric | Value |
 |--------|-------|
 | Duration | 110m 26s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-11 14:55]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 35480 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 454m 58s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-12 14:52]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 36671 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 431m 8s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 09:15]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 32118 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 81m 28s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 09:25]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 9m 36s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 09:36]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 11m 21s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 09:40]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 0m 30s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 11:06]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 48m 39s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 11:58]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 51m 29s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-13 15:18]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 200m 33s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-14 14:49]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 36618 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 438m 3s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-15 13:12]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 261m 52s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-15 14:58]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 105m 56s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-18 15:01]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 31459 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 430m 53s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-19 14:58]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 416m 15s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-20 15:09]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 425m 14s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-21 15:04]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 408 |
+| DNSE trade symbol (resolved) | 41I1G5000 |
+| secdef symbol used (API) | 41I1G5000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 27974 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 425m 48s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-22 14:52]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 19215 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 421m 17s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+
+## TTM V2 tiered research gates (2026-05-25)
+
+**Ngày test:** 2026-05-25  
+**Files:** `tests/test_ttm_v2_gates.py`, `tests/test_ttm_v2_post_refactor_integration.py`  
+**Kết quả:** 9/9 + 6/6 PASS
+
+| # | Test case | Module | Mô tả | Kết quả |
+|---|-----------|--------|-------|---------|
+| 1 | gate mode resolve (live→strict) | `ttm_v2_gates` | Live không dùng research gate | ✅ PASS |
+| 2 | research_paper alias | `ttm_v2_gates` | `research_paper` → `quality_research` | ✅ PASS |
+| 3 | strict vs percentile research | `ttm_v2_gates` | Strict chặn score≤0; research cho phép candidate âm | ✅ PASS |
+| 4 | long candidate universe | `ttm_v2_gates` | recent ignition + pullback sau breakout | ✅ PASS |
+| 5 | exploratory ≥ quality | `ttm_v2_gates` | exploratory rộng hơn quality | ✅ PASS |
+| 6 | gate diagnostics on signal | `ttm_signal_v2` | `v2_gate_diagnostics` đủ trường tiered | ✅ PASS |
+| 7 | research trade cap | `ttm_v2_gates` | `max_research_trades_per_day` | ✅ PASS |
+| 8 | integration refactor5 | `ttm_validation` | Post-refactor wiring | ✅ PASS (6 tests) |
+
+**Backtest evidence (VN30F1M 20260401–20260522, res=15, quality_research):**
+
+| Gate mode | LONG candidates (passed gate) | Actual V2 trades |
+|-----------|------------------------------|------------------|
+| strict | 0 | 0 |
+| quality_research | 40 | 1 |
+| exploratory_research | 48 | — (counterfactual diagnostics) |
+| long_universe (any candidate bar) | 104 | — |
+
+**Before (old research_paper):** strict 0 trades, research_paper ~2 trades over same window (PM report).  
+**After:** candidate validation usable (`candidate_count_sufficient_for_validation=true`); alpha still `insufficient_trade_sample` (1 trade < 20).
+
+**Cập nhật lần cuối (section):** 2026-05-25
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-25 15:01]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 373m 59s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-26 10:03]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | 33498 |
+| OI source (rest vs websocket) | websocket |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 137m 52s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-26 10:20]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 16m 26s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-26 10:49]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 28m 28s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-26 13:26]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 157m 42s |
+| Signals generated | 0 |
+| Orders placed | 0 |
+| Paper fills | 0 |
+| Realized P&L | 0.00 |
+| Commission | 0.00 |
+| Net P&L | 0.00 |
+| Win rate | 0.0% (0W / 0L) |
+| Risk halted | False |
+| Stoploss triggers | 0 |
+
+### Evaluation
+- [ ] TTM signals logged with strategy/action/confidence/reason
+- [ ] No overlapping entries when flat
+- [ ] Risk manager correctly gated orders
+
+---
+## Paper Test Session (TTM) -- VN30F1M [2026-05-26 14:48]
+
+### Configuration
+| Parameter | Value |
+|-----------|-------|
+| Symbol | VN30F1M |
+| STRATEGY_ALGO | TTM |
+| breakout_window | 20 |
+| failure_window | 3 |
+| vol_threshold | 1.2 |
+| oi_z_threshold | 0.8 |
+| stop_loss_points | 8.0 |
+| take_profit_points | 12.0 |
+| max_bars_in_trade | 10 |
+| use_open_interest | False |
+| DNSE secdef HTTP status (last) | 200 |
+| DNSE trade symbol (resolved) | 41I1G6000 |
+| secdef symbol used (API) | 41I1G6000 |
+| boardId (secdef query) | G1 |
+| openInterestQuantity (last) | None |
+| OI source (rest vs websocket) | none |
+
+### Session Results
+| Metric | Value |
+|--------|-------|
+| Duration | 81m 4s |
 | Signals generated | 0 |
 | Orders placed | 0 |
 | Paper fills | 0 |

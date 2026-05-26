@@ -1626,6 +1626,283 @@ def _nondegenerate_spike_threshold(pos: np.ndarray) -> Tuple[Optional[float], st
     return float(np.max(pos_only)), "positive_subset_max"
 
 
+def _gate_diag_from_decision(d: Dict[str, Any]) -> Dict[str, Any]:
+    v2 = d.get("v2") or {}
+    gd = v2.get("gate_diagnostics")
+    return dict(gd) if isinstance(gd, dict) else {}
+
+
+def _score_distribution(vals: List[float]) -> Dict[str, Any]:
+    a = np.asarray(vals, dtype=np.float64)
+    a = a[np.isfinite(a)]
+    if a.size == 0:
+        return {"n": 0, "min": None, "p25": None, "p50": None, "p75": None, "max": None}
+    return {
+        "n": int(a.size),
+        "min": float(np.min(a)),
+        "p25": float(np.quantile(a, 0.25)),
+        "p50": float(np.quantile(a, 0.50)),
+        "p75": float(np.quantile(a, 0.75)),
+        "max": float(np.max(a)),
+    }
+
+
+def _top_bottom_forward_stats(fwd_pairs: List[Tuple[float, float]]) -> Dict[str, Any]:
+    """Pairs of (score, forward_return) for candidate bars."""
+    if not fwd_pairs:
+        return {"top20_mean_forward_return": None, "bottom20_mean_forward_return": None, "n": 0}
+    pairs = [(float(s), float(r)) for s, r in fwd_pairs if np.isfinite(s) and np.isfinite(r)]
+    if not pairs:
+        return {"top20_mean_forward_return": None, "bottom20_mean_forward_return": None, "n": 0}
+    pairs.sort(key=lambda x: x[0])
+    n = len(pairs)
+    k = max(1, int(round(n * 0.20)))
+    bottom = [r for _, r in pairs[:k]]
+    top = [r for _, r in pairs[-k:]]
+    return {
+        "n": int(n),
+        "top20_mean_forward_return": float(np.mean(top)),
+        "bottom20_mean_forward_return": float(np.mean(bottom)),
+        "top20_winrate": float(np.mean(np.array(top) > 0.0)),
+        "bottom20_winrate": float(np.mean(np.array(bottom) > 0.0)),
+    }
+
+
+def build_gate_mode_report(
+    *,
+    decisions: Sequence[Dict[str, Any]],
+    trades: Sequence[Dict[str, Any]],
+    closes: np.ndarray,
+    forward_horizon: int = 4,
+    configured_gate_mode: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Aggregate strict / quality / exploratory / signal_only gate diagnostics per decision."""
+    modes = ("strict", "quality_research", "exploratory_research", "signal_only")
+    long_keys = {
+        "strict": "strict_long_allowed",
+        "quality_research": "quality_research_long_allowed",
+        "exploratory_research": "exploratory_research_long_allowed",
+        "signal_only": "signal_only_long_allowed",
+    }
+    short_keys = {
+        "strict": "strict_short_allowed",
+        "quality_research": "quality_research_short_allowed",
+        "exploratory_research": "exploratory_research_short_allowed",
+    }
+    block_keys = {
+        "strict": "strict_block_reason",
+        "quality_research": "quality_research_block_reason",
+        "exploratory_research": "exploratory_research_block_reason",
+        "signal_only": "signal_only_block_reason",
+    }
+    out: Dict[str, Any] = {}
+    closed_v2 = [
+        t
+        for t in trades
+        if str(t.get("model", "")).lower() == "v2" and str(t.get("event", "")).upper() == "CLOSED"
+    ]
+    score_vals: List[float] = []
+    pct_vals: List[float] = []
+    cp_counts: Counter = Counter()
+    entry_confirm_blocks: Counter = Counter()
+    universe_cand = 0
+
+    for d in decisions:
+        gd = _gate_diag_from_decision(d)
+        if gd.get("long_candidate"):
+            universe_cand += 1
+        eb = d.get("entry_block_reason") or (d.get("v2") or {}).get("entry_block_reason")
+        if eb:
+            entry_confirm_blocks[str(eb)] += 1
+
+    cfg_mode = str(configured_gate_mode or "").strip().lower()
+    if cfg_mode == "research_paper":
+        cfg_mode = "quality_research"
+
+    for mode in modes:
+        cand = 0
+        blocked = Counter()
+        fwd: List[float] = []
+        fwd_pairs: List[Tuple[float, float]] = []
+        mode_scores: List[float] = []
+        mode_pcts: List[float] = []
+        mode_phases: Counter = Counter()
+        for d in decisions:
+            gd = _gate_diag_from_decision(d)
+            if not gd:
+                continue
+            lk = long_keys.get(mode)
+            if lk and bool(gd.get(lk)):
+                cand += 1
+                sl = _safe_float(gd.get("score_long"))
+                if sl is not None:
+                    mode_scores.append(float(sl))
+                pct = _safe_float(gd.get("score_long_candidate_percentile"))
+                if pct is not None:
+                    mode_pcts.append(float(pct))
+                mode_phases[str(gd.get("crowd_phase") or _decision_crowd_phase(d) or "unknown")] += 1
+                bi = int(d.get("bar_index", -1))
+                if 0 <= bi < len(closes):
+                    fr = _forward_return(closes, bi, forward_horizon)
+                    if np.isfinite(fr):
+                        fwd.append(float(fr))
+                        if sl is not None:
+                            fwd_pairs.append((float(sl), float(fr)))
+            elif lk and gd.get("long_candidate"):
+                br = str(gd.get(block_keys.get(mode, "")) or "blocked")
+                blocked[br] += 1
+        short_cand = 0
+        if mode != "signal_only":
+            sk = short_keys.get(mode)
+            for d in decisions:
+                gd = _gate_diag_from_decision(d)
+                if sk and bool(gd.get(sk)):
+                    short_cand += 1
+        winrate = float(np.mean(np.array(fwd) > 0.0)) if fwd else None
+        actual_trades = int(len(closed_v2)) if cfg_mode and mode == cfg_mode else 0
+        out[mode] = {
+            "long_candidate_count": int(cand),
+            "long_universe_candidate_count": int(universe_cand),
+            "short_candidate_count": int(short_cand),
+            "actual_v2_closed_trades": actual_trades,
+            "blocked_count_by_reason": dict(blocked),
+            "mean_forward_return_candidates": float(np.mean(fwd)) if fwd else None,
+            "candidate_forward_return_winrate": winrate,
+            "candidate_forward_return_n": int(len(fwd)),
+            "score_long_distribution": _score_distribution(mode_scores),
+            "score_percentile_distribution": _score_distribution(mode_pcts),
+            "top_bottom_forward_return": _top_bottom_forward_stats(fwd_pairs),
+            "phase_distribution": dict(mode_phases),
+            "entry_confirm_block_stats": dict(entry_confirm_blocks),
+        }
+        if cand == 0:
+            top = Counter()
+            for d in decisions:
+                gd = _gate_diag_from_decision(d)
+                if gd and gd.get("long_candidate") and not gd.get(lk):
+                    top[str(gd.get(block_keys.get(mode, "")) or "unknown")] += 1
+            out[mode]["top_blocking_reason_if_zero_passed"] = dict(top.most_common(8))
+
+    for d in decisions:
+        v2 = d.get("v2") or {}
+        sc = _decision_v2_score_components(d)
+        sl = _safe_float(v2.get("score_long") if v2.get("score_long") is not None else sc.get("score_long"))
+        if sl is not None:
+            score_vals.append(float(sl))
+        gd = _gate_diag_from_decision(d)
+        pct = _safe_float(gd.get("score_long_candidate_percentile"))
+        if pct is not None:
+            pct_vals.append(float(pct))
+        cp_counts[str(_decision_crowd_phase(d) or "unknown")] += 1
+
+    out["score_long_distribution"] = _score_distribution(score_vals)
+    out["score_percentile_distribution"] = _score_distribution(pct_vals)
+    out["crowd_phase_distribution"] = dict(cp_counts)
+    out["actual_v2_closed_total"] = int(len(closed_v2))
+    out["configured_gate_mode"] = cfg_mode or None
+    min_trades_for_alpha = 20
+    if len(closed_v2) < min_trades_for_alpha:
+        out["alpha_validation_status"] = "insufficient_trade_sample"
+        out["candidate_validation_status"] = (
+            "candidate_universe_available"
+            if universe_cand > 0
+            else "insufficient_candidate_universe"
+        )
+    else:
+        out["alpha_validation_status"] = "alpha_sample_available"
+        out["candidate_validation_status"] = "candidate_universe_available"
+    out["insufficient_trade_sample"] = bool(len(closed_v2) < min_trades_for_alpha)
+    out["candidate_count_sufficient_for_validation"] = bool(universe_cand >= 30)
+    out["research_prob_gate_report"] = _build_research_prob_gate_report(
+        decisions=decisions,
+        trades=trades,
+        configured_gate_mode=cfg_mode,
+    )
+    return out
+
+
+def _build_research_prob_gate_report(
+    *,
+    decisions: Sequence[Dict[str, Any]],
+    trades: Sequence[Dict[str, Any]],
+    configured_gate_mode: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Research softmax entry diagnostics among tier-passed candidates."""
+    quality_probs: List[float] = []
+    expl_probs: List[float] = []
+    blocked_prob = Counter()
+    blocked_cap = Counter()
+    entry_allowed_quality = 0
+    entry_allowed_expl = 0
+    long_decisions = 0
+    closed_v2 = [
+        t
+        for t in trades
+        if str(t.get("model", "")).lower() == "v2" and str(t.get("event", "")).upper() == "CLOSED"
+    ]
+
+    for d in decisions:
+        gd = _gate_diag_from_decision(d)
+        if not gd:
+            continue
+        pl = _safe_float(gd.get("prob_long") if gd.get("prob_long") is not None else (d.get("v2") or {}).get("prob_long"))
+        if bool(gd.get("quality_research_long_allowed")):
+            if pl is not None:
+                quality_probs.append(float(pl))
+            if bool(gd.get("research_long_entry_allowed")) and str(
+                gd.get("research_entry_source") or ""
+            ) in ("quality_research", "exploratory_research"):
+                entry_allowed_quality += 1
+            if bool(gd.get("blocked_by_prob_gate")):
+                blocked_prob["quality_research"] += 1
+            if bool(gd.get("blocked_by_trade_cap")):
+                blocked_cap["quality_research"] += 1
+        if bool(gd.get("exploratory_research_long_allowed")):
+            if pl is not None:
+                expl_probs.append(float(pl))
+            if bool(gd.get("research_long_entry_allowed")) and str(
+                gd.get("research_entry_source") or ""
+            ) == "exploratory_research":
+                entry_allowed_expl += 1
+            if bool(gd.get("blocked_by_prob_gate")):
+                blocked_prob["exploratory_research"] += 1
+            if bool(gd.get("blocked_by_trade_cap")):
+                blocked_cap["exploratory_research"] += 1
+        if str((d.get("v2") or {}).get("decision", "")).upper() == "LONG":
+            long_decisions += 1
+
+    def _prob_counts(probs: List[float]) -> Dict[str, Any]:
+        a = np.asarray(probs, dtype=np.float64)
+        a = a[np.isfinite(a)]
+        if a.size == 0:
+            return {
+                "distribution": _score_distribution([]),
+                "count_prob_gt_0_6": 0,
+                "count_prob_gt_0_2": 0,
+                "count_prob_gt_0_05": 0,
+            }
+        return {
+            "distribution": _score_distribution(probs),
+            "count_prob_gt_0_6": int(np.sum(a > 0.6)),
+            "count_prob_gt_0_2": int(np.sum(a > 0.2)),
+            "count_prob_gt_0_05": int(np.sum(a > 0.05)),
+        }
+
+    return {
+        "configured_gate_mode": configured_gate_mode,
+        "quality_candidates_count": int(len(quality_probs)),
+        "exploratory_candidates_count": int(len(expl_probs)),
+        "quality_prob_long": _prob_counts(quality_probs),
+        "exploratory_prob_long": _prob_counts(expl_probs),
+        "research_long_entry_allowed_quality": int(entry_allowed_quality),
+        "research_long_entry_allowed_exploratory": int(entry_allowed_expl),
+        "v2_long_decisions": int(long_decisions),
+        "actual_v2_closed_trades": int(len(closed_v2)),
+        "blocked_by_prob_gate_count": dict(blocked_prob),
+        "blocked_by_trade_cap_count": dict(blocked_cap),
+    }
+
+
 def build_refactor5_report(
     *,
     decisions: Sequence[Dict[str, Any]],
@@ -2022,6 +2299,71 @@ def build_refactor5_report(
         "acceptance_note": "Do not force positive SHORT pnl on small sample; require phase separation/logging.",
     }
 
+    # 9b) post-refactor wiring diagnostics: v3 score consistency + short context persistence
+    score_component_mismatch_count = 0
+    score_tanh_mismatch_count = 0
+    raw_negative_strong_positive_count = 0
+    score_rows_checked = 0
+    for d in decisions:
+        v2 = d.get("v2") or {}
+        sc = _decision_v2_score_components(d)
+        v2_sl = _safe_float(v2.get("score_long"))
+        sc_sl = _safe_float(sc.get("score_long"))
+        eff = _safe_float(sc.get("effective_strength"))
+        eraw = _safe_float(sc.get("effective_strength_raw"))
+        if v2_sl is not None and sc_sl is not None:
+            score_rows_checked += 1
+            if abs(float(v2_sl) - float(sc_sl)) >= 1e-9:
+                score_component_mismatch_count += 1
+        if sc_sl is not None and eff is not None:
+            if abs(float(sc_sl) - float(np.tanh(float(eff)))) >= 1e-6:
+                score_tanh_mismatch_count += 1
+        if eraw is not None and float(eraw) < 0.0 and v2_sl is not None and float(v2_sl) > 0.5:
+            raw_negative_strong_positive_count += 1
+    score_component_consistency = {
+        "rows_checked": int(score_rows_checked),
+        "score_component_mismatch_count": int(score_component_mismatch_count),
+        "score_tanh_mismatch_count": int(score_tanh_mismatch_count),
+        "raw_negative_strong_positive_count": int(raw_negative_strong_positive_count),
+    }
+
+    phase_reason_counts = Counter(
+        str(_decision_v2_score_components(d).get("phase_reason") or "unknown")
+        for d in decisions
+    )
+    phase_diagnostics = {
+        "phase_reason_distribution": dict(phase_reason_counts),
+        "missing_phase_reason_count": int(phase_reason_counts.get("unknown", 0)),
+    }
+
+    max_short_ctx = 20
+    last_ignition_ix: Optional[int] = None
+    short_context_missing_after_ignition = 0
+    short_context_rows_checked = 0
+    for d in sorted(decisions, key=lambda x: int(x.get("bar_index", -1))):
+        bi = int(d.get("bar_index", -1))
+        ph = _decision_crowd_phase(d)
+        if ph in ("ignition", "early_continuation"):
+            last_ignition_ix = bi
+        if last_ignition_ix is None or bi <= last_ignition_ix:
+            continue
+        if bi - last_ignition_ix > max_short_ctx:
+            continue
+        sh = _decision_v2_short_components(d)
+        short_context_rows_checked += 1
+        if (
+            not bool(sh.get("prior_upside_breakout_exists"))
+            or sh.get("last_upside_breakout_bar_index") is None
+            or _safe_float(sh.get("bars_since_upside_breakout")) is None
+            or float(sh.get("bars_since_upside_breakout") or 0.0) < 1.0
+        ):
+            short_context_missing_after_ignition += 1
+    short_context_persistence = {
+        "rows_checked_after_ignition": int(short_context_rows_checked),
+        "missing_context_rows": int(short_context_missing_after_ignition),
+        "context_window_bars_assumed": int(max_short_ctx),
+    }
+
     # 10) before/after summary
     def _summary_from_current() -> Dict[str, Any]:
         all_rets = np.asarray([x for x in (_safe_float(t.get("realized_return")) for t in closed) if x is not None], dtype=np.float64)
@@ -2132,6 +2474,12 @@ def build_refactor5_report(
     actual_short_unknown_exit_reason_count = sum(
         1 for t in short_closed if str(t.get("exit_reason") or "unknown") == "unknown"
     )
+    actual_short_invalid_phase_count = sum(
+        1
+        for t in short_closed
+        if str(t.get("short_entry_phase") or "unknown")
+        not in ("short_trigger", "short_setup")
+    )
     all_trade_phases = bool(
         len(short_closed) == 0 or actual_short_unknown_phase_count < len(short_closed)
     )
@@ -2156,6 +2504,12 @@ def build_refactor5_report(
             "unknown_exit_reason_count": int(unknown_exit_count),
             "actual_short_unknown_phase_count": int(actual_short_unknown_phase_count),
             "actual_short_unknown_exit_reason_count": int(actual_short_unknown_exit_reason_count),
+            "actual_short_invalid_phase_count": int(actual_short_invalid_phase_count),
+            "score_component_mismatch_count": int(score_component_mismatch_count),
+            "score_tanh_mismatch_count": int(score_tanh_mismatch_count),
+            "raw_negative_strong_positive_count": int(raw_negative_strong_positive_count),
+            "short_context_missing_after_ignition": int(short_context_missing_after_ignition),
+            "missing_phase_reason_count": int(phase_diagnostics["missing_phase_reason_count"]),
         },
         "exit": {
             "holding_period_stats_reported": bool(holding_period_performance),
@@ -2174,6 +2528,12 @@ def build_refactor5_report(
             and all_trade_exit_reason
             and all_trade_phases
             and (len(short_closed) == 0 or actual_short_unknown_exit_reason_count < len(short_closed))
+            and actual_short_invalid_phase_count == 0
+            and score_component_mismatch_count == 0
+            and score_tanh_mismatch_count == 0
+            and raw_negative_strong_positive_count == 0
+            and short_context_missing_after_ignition == 0
+            and int(phase_diagnostics["missing_phase_reason_count"]) == 0
         ),
     }
     insufficient_sample_warnings: List[str] = []
@@ -2183,6 +2543,35 @@ def build_refactor5_report(
         insufficient_sample_warnings.append("actual SHORT trades < 20; collect 50-100 candidates/trades before tuning")
     if len(long_closed) < 30:
         insufficient_sample_warnings.append("LONG trades limited; avoid overfit conclusions")
+
+    gate_mode_report = build_gate_mode_report(
+        decisions=decisions,
+        trades=trades,
+        closes=closes,
+        forward_horizon=forward_horizon,
+        configured_gate_mode=str(merge_meta.get("ttm_v2_gate_mode") or ""),
+    )
+    instr_ok = bool(
+        coverage_ok
+        and phase_wired_ok
+        and score_component_mismatch_count == 0
+        and score_tanh_mismatch_count == 0
+        and raw_negative_strong_positive_count == 0
+        and short_context_missing_after_ignition == 0
+        and int(phase_diagnostics["missing_phase_reason_count"]) == 0
+    )
+    alpha_status = str(gate_mode_report.get("alpha_validation_status") or "")
+    acceptance["alpha_validation_status"] = alpha_status
+    acceptance["instrumentation_acceptance"] = bool(instr_ok)
+    acceptance["candidate_validation_status"] = str(
+        gate_mode_report.get("candidate_validation_status") or ""
+    )
+    acceptance["overall_acceptance"] = bool(
+        acceptance["overall_acceptance"]
+        and len(closed) > 0
+        and alpha_status == "alpha_sample_available"
+        and not bool(gate_mode_report.get("insufficient_trade_sample"))
+    )
 
     return {
         "dataset_summary": dataset_summary,
@@ -2197,6 +2586,10 @@ def build_refactor5_report(
         },
         "exit_reason_performance": exit_reason_performance,
         "short_validation": short_validation,
+        "score_component_consistency": score_component_consistency,
+        "phase_diagnostics": phase_diagnostics,
+        "short_context_persistence": short_context_persistence,
+        "gate_mode_report": gate_mode_report,
         "before_after": before_after,
         "acceptance": acceptance,
         "insufficient_sample_warnings": insufficient_sample_warnings,
